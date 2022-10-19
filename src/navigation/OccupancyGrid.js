@@ -18,6 +18,7 @@ ROS3D.OccupancyGrid = function(options) {
   var message = options.message;
   var opacity = options.opacity || 1.0;
   var color = options.color || {r:255,g:255,b:255,a:255};
+  var transform = options.transform || this.defaultTransform;
 
   // create the geometry
   var info = message.info;
@@ -73,7 +74,7 @@ ROS3D.OccupancyGrid = function(options) {
       var invRow = (height - row - 1);
       var mapI = col + (invRow * width);
       // determine the value
-      var val = this.getValue(mapI, invRow, col, data);
+      var val = this.transformMapData(this.getValue(mapI, invRow, col, data), transform);
 
       // determine the color
       var color = this.getColor(mapI, invRow, col, val);
@@ -124,5 +125,40 @@ ROS3D.OccupancyGrid.prototype.getColor = function(index, row, col, value) {
     255
   ];
 };
+
+
+/**
+ * RANDEL!!!
+ * Transforms Occupancy map value [0, 100], to a grayscale map by using the transform <transform>.
+ * @param {int} value occupancy value
+ * @param {function} transform the function used for transformation
+ * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
+ */
+ ROS3D.OccupancyGrid.prototype.transformMapData = function(value, transform=this.defaultTransform) {
+  return transform(value);
+};
+
+/**
+ * RANDEL!!!
+ * This is the legacy transform.
+ * Transforms occupancy value to a grayscale value.
+ * A value of 100 (100% occupied) is black, a value of 0 (certainly UNoccupied) is white.
+ * Other values are set to 127 (gray).
+ * @param {int} value the value of the cell. Value should be [0, 100]
+ * @returns grayscale value from 0 to 255 representing the occupancy value.
+ */
+ ROS3D.OccupancyGrid.prototype.defaultTransform = function(value) {
+  var val_trans = value;
+  if (value === 100) {
+    val_trans = 0;
+  } else if (value === 0) {
+    val_trans = 255;
+  } else {
+    val_trans = 127;
+  }
+  
+  return val_trans;
+};
+
 
 ROS3D.OccupancyGrid.prototype.__proto__ = THREE.Mesh.prototype;
