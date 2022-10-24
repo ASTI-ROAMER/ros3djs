@@ -55949,6 +55949,24 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
 
 /**
  * @fileOverview
+ * @author Russell Toris - rctoris@wpi.edu
+ */
+
+var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
+  function OccupancyGridClientNav(options) {
+    OccupancyGridClient.call(this, options);
+
+  }
+
+  if ( OccupancyGridClient ) OccupancyGridClientNav.__proto__ = OccupancyGridClient;
+  OccupancyGridClientNav.prototype = Object.create( OccupancyGridClient && OccupancyGridClient.prototype );
+  OccupancyGridClientNav.prototype.constructor = OccupancyGridClientNav;
+
+  return OccupancyGridClientNav;
+}(OccupancyGridClient));
+
+/**
+ * @fileOverview
  * @author Peter Sari - sari@photoneo.com
  */
 
@@ -58910,6 +58928,7 @@ exports.OcTree = OcTree;
 exports.OcTreeClient = OcTreeClient;
 exports.OccupancyGrid = OccupancyGrid;
 exports.OccupancyGridClient = OccupancyGridClient;
+exports.OccupancyGridClientNav = OccupancyGridClientNav;
 exports.Odometry = Odometry;
 exports.OrbitControls = OrbitControls;
 exports.Path = Path;

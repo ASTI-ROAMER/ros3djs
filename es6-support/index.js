@@ -23,6 +23,7 @@ export * from './models/TriangleList'
 
 export * from './navigation/OccupancyGrid'
 export * from './navigation/OccupancyGridClient'
+export * from './navigation/OccupancyGridClientNav'
 export * from './navigation/OcTree'
 export * from './navigation/ColorOcTree'
 export * from './navigation/OcTreeClient'
