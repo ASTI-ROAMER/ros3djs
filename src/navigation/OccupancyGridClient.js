@@ -35,6 +35,9 @@ ROS3D.OccupancyGridClient = function(options) {
   this.offsetPose = options.offsetPose || new ROSLIB.Pose();
   this.color = options.color || {r:255,g:255,b:255};
   this.opacity = options.opacity || 1.0;
+  this.viewer = options.viewer || null;
+  this.navServerName = options.navServerName || '/move_base';
+  this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
 
   // current grid that is displayed
   this.currentGrid = null;
@@ -80,10 +83,21 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
     this.currentGrid.dispose();
   }
 
-  var newGrid = new ROS3D.OccupancyGrid({
+  var grid_handler = new ROS3D.Navigator({
+    ros: this.ros,
+    tfClient: this.tfClient,
+    rootObject: this,
+    serverName: this.navServerName,
+    actionName: this.navActionName,
+    occupancyGridFrameID: message.header.frame_id,
+
+  });
+
+  var newGrid = new ROS3D.OccupancyGridNav({
     message : message,
     color : this.color,
-    opacity : this.opacity
+    opacity : this.opacity,
+    handler: grid_handler,
   });
 
   // check if we care about the scene
@@ -103,6 +117,10 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
   } else {
     this.sceneNode = this.currentGrid = newGrid;
     this.rootObject.add(this.currentGrid);
+  }
+
+  if (this.viewer){
+    this.viewer.addObject(this.sceneNode, true);
   }
 
   this.emit('change');

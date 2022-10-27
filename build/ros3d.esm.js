@@ -55825,6 +55825,410 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
 }(THREE.Mesh));
 
 /**
+ * @author Russell Toris - rctoris@wpi.edu
+ * @author Lars Kunze - l.kunze@cs.bham.ac.uk
+ * @author Raffaello Bonghi - raffaello.bonghi@officinerobotiche.it
+ * @author Randel
+ */
+
+var Navigator = /*@__PURE__*/(function (superclass) {
+  function Navigator(options) {
+  
+    superclass.call(this);
+    options = options || {};
+    var ros = options.ros;
+    this.tfClient = options.tfClient || null;
+    options.robot_pose || '/robot_pose';
+    var serverName = options.serverName || '/move_base';
+    var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
+    options.withOrientation || false;
+    options.image;
+    this.rootObject = options.rootObject;
+    this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
+
+    this.goalMarker = null;
+    this.isActive = true;
+
+    // binding mouse handlers
+    // this.onMouseDblClick = this.onMouseDblClickUnbound.bind(this);
+    // this.onMouseDown = this.onMouseDownUnbound.bind(this);
+
+    // setup the actionlib client
+    this.actionClient = new ROSLIB.ActionClient({
+      ros : ros,
+      actionName : actionName,
+      serverName : serverName
+    });
+    
+    // Since this called by objects other than itself (addeventlistener on OGNav)
+    this.mouseEventHandler = this.mouseEventHandlerUnbound.bind(this);
+    
+
+  }
+
+  if ( superclass ) Navigator.__proto__ = superclass;
+  Navigator.prototype = Object.create( superclass && superclass.prototype );
+  Navigator.prototype.constructor = Navigator;
+
+
+  Navigator.prototype.sendGoal = function sendGoal (pose){
+    // create a goal, use the message type move_base_msgs/MoveBaseAction
+    var goalMessage = {
+      target_pose : {
+        header : {
+          frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
+        },
+        pose : pose
+      }
+    };
+    // Only add "priority_val" on roamer messages since move_base_msgs/MoveBaseAction has no priority,
+    // will produce error if the message and message type fields do not match
+    if (this.actionClient.actionName === 'roamer_msgs/MoveBaseAction'){
+      goalMessage.priority_val = 1;   // Since prio=0 can't override previous prio=0 goals
+    }
+    var goal = new ROSLIB.Goal({
+      actionClient : this.actionClient,
+      goalMessage : goalMessage,
+    });
+    goal.send();
+    
+    this.currentGoal = goal;
+  };
+
+
+  // onMouseDownUnbound(e){
+  //   // convert to ROS coordinates
+
+  //   var poi = e.intersection.point; 
+  //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+  //   var pose = new ROSLIB.Pose({
+  //     position : new ROSLIB.Vector3(coords)
+  //   });
+  //   // send the goal
+  //   this.sendGoal(pose);
+  //   e.stopPropagation();
+  //   console.log('nav: mouseDOWN')
+
+  // };
+
+  // onMouseDblClickUnbound(e){
+  //   // convert to ROS coordinates
+
+  //   var poi = e.intersection.point; 
+  //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+  //   var pose = new ROSLIB.Pose({
+  //     position : new ROSLIB.Vector3(coords)
+  //   });
+  //   // send the goal
+  //   this.sendGoal(pose);
+  //   e.stopPropagation();
+  //   console.log('nav: mouseDBLCLICK')
+
+  // };
+
+
+  Navigator.prototype.mouseEventHandlerUnbound = function mouseEventHandlerUnbound (event3D){
+    // only handle mouse events when active AND with left mouse button is pressed
+    if (this.isActive && (event3D.domEvent.button === 0)){
+      event3D.stopPropagation();
+      switch(event3D.domEvent.type){
+        case 'mousedown':
+          var poi = event3D.intersection.point; 
+          var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+          var pose = new ROSLIB.Pose({
+            position : new ROSLIB.Vector3(coords)
+          });
+          // send the goal
+          this.sendGoal(pose);
+          console.log('nav: mouseDOWN');
+          break;
+
+        case 'dblclick':
+          var poi = event3D.intersection.point; 
+          var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+          var pose = new ROSLIB.Pose({
+            position : new ROSLIB.Vector3(coords)
+          });
+          // send the goal
+          this.sendGoal(pose);
+          console.log('nav: mouseDBLCLICK');
+
+        default:
+          event3D.stopPropagation();      // If no one accepts, UNDO the stopPropagation()
+      }
+    }
+  };
+
+
+  Navigator.prototype.activate = function activate (event3D){
+    this.isActive = true;
+  };
+
+  Navigator.prototype.deactivate = function deactivate (event3D){
+    this.isActive = false;
+  };
+
+  Navigator.prototype.toggleActivation = function toggleActivation (event3D){
+    this.isActive = !this.isActive;
+    console.log('Navigator isActive: ' + this.isActive);
+  };
+
+  return Navigator;
+}(THREE.Mesh));
+
+/**
+ * @fileOverview
+ * @author David Gossow - dgossow@willowgarage.com
+ */
+
+var MouseHandler = /*@__PURE__*/(function (superclass) {
+  function MouseHandler(options) {
+    superclass.call(this);
+    this.renderer = options.renderer;
+    this.camera = options.camera;
+    this.rootObject = options.rootObject;
+    this.fallbackTarget = options.fallbackTarget;
+    this.lastTarget = this.fallbackTarget;
+    this.dragging = false;
+
+    // listen to DOM events
+    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
+        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
+        'touchleave', 'touchmove' ];
+    this.listeners = {};
+
+    // add event listeners for the associated mouse events
+    eventNames.forEach(function(eventName) {
+      this.listeners[eventName] = this.processDomEvent.bind(this);
+      this.renderer.domElement.addEventListener(eventName, this.listeners[eventName], false);
+    }, this);
+  }
+
+  if ( superclass ) MouseHandler.__proto__ = superclass;
+  MouseHandler.prototype = Object.create( superclass && superclass.prototype );
+  MouseHandler.prototype.constructor = MouseHandler;
+  /**
+   * Process the particular DOM even that has occurred based on the mouse's position in the scene.
+   *
+   * @param domEvent - the DOM event to process
+   */
+  MouseHandler.prototype.processDomEvent = function processDomEvent (domEvent) {
+    // don't deal with the default handler
+    domEvent.preventDefault();
+
+    // compute normalized device coords and 3D mouse ray
+    var target = domEvent.target;
+    var rect = target.getBoundingClientRect();
+    var pos_x, pos_y;
+
+    if(domEvent.type.indexOf('touch') !== -1) {
+      pos_x = 0;
+      pos_y = 0;
+      for(var i=0; i<domEvent.touches.length; ++i) {
+          pos_x += domEvent.touches[i].clientX;
+          pos_y += domEvent.touches[i].clientY;
+      }
+      pos_x /= domEvent.touches.length;
+      pos_y /= domEvent.touches.length;
+    }
+    else {
+  	pos_x = domEvent.clientX;
+  	pos_y = domEvent.clientY;
+    }
+    var left = pos_x - rect.left - target.clientLeft + target.scrollLeft;
+    var top = pos_y - rect.top - target.clientTop + target.scrollTop;
+    var deviceX = left / target.clientWidth * 2 - 1;
+    var deviceY = -top / target.clientHeight * 2 + 1;
+    var mousePos = new THREE.Vector2(deviceX, deviceY);
+
+    var mouseRaycaster = new THREE.Raycaster();
+    mouseRaycaster.linePrecision = 0.001;
+    mouseRaycaster.setFromCamera(mousePos, this.camera);
+    var mouseRay = mouseRaycaster.ray;
+
+    // make our 3d mouse event
+    var event3D = {
+      mousePos : mousePos,
+      mouseRay : mouseRay,
+      domEvent : domEvent,
+      camera : this.camera,
+      intersection : this.lastIntersection
+    };
+
+    // if the mouse leaves the dom element, stop everything
+    if (domEvent.type === 'mouseout') {
+      if (this.dragging) {
+        this.notify(this.lastTarget, 'mouseup', event3D);
+        this.dragging = false;
+      }
+      this.notify(this.lastTarget, 'mouseout', event3D);
+      this.lastTarget = null;
+      return;
+    }
+
+    // if the touch leaves the dom element, stop everything
+    if (domEvent.type === 'touchleave' || domEvent.type === 'touchend') {
+      if (this.dragging) {
+        this.notify(this.lastTarget, 'mouseup', event3D);
+        this.dragging = false;
+      }
+      this.notify(this.lastTarget, 'touchend', event3D);
+      this.lastTarget = null;
+      return;
+    }
+
+    // while the user is holding the mouse down, stay on the same target
+    if (this.dragging) {
+      this.notify(this.lastTarget, domEvent.type, event3D);
+      // for check for right or left mouse button
+      if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
+        this.dragging = false;
+      }
+      return;
+    }
+
+    // in the normal case, we need to check what is under the mouse
+    target = this.lastTarget;
+    var intersections = [];
+    intersections = mouseRaycaster.intersectObject(this.rootObject, true);
+
+    if (intersections.length > 0) {
+      target = intersections[0].object;
+      event3D.intersection = this.lastIntersection = intersections[0];
+    } else {
+      target = this.fallbackTarget;
+    }
+
+    // if the mouse moves from one object to another (or from/to the 'null' object), notify both
+    if (target !== this.lastTarget && domEvent.type.match(/mouse/)) {
+
+      // Event Status. TODO: Make it as enum
+      // 0: Accepted
+      // 1: Failed
+      // 2: Continued
+      var eventStatus = this.notify(target, 'mouseover', event3D);
+      if (eventStatus === 0) {
+        this.notify(this.lastTarget, 'mouseout', event3D);
+      } else if(eventStatus === 1) {
+        // if target was null or no target has caught our event, fall back
+        target = this.fallbackTarget;
+        if (target !== this.lastTarget) {
+          this.notify(target, 'mouseover', event3D);
+          this.notify(this.lastTarget, 'mouseout', event3D);
+        }
+      }
+    }
+
+    // if the finger moves from one object to another (or from/to the 'null' object), notify both
+    if (target !== this.lastTarget && domEvent.type.match(/touch/)) {
+      var toucheventAccepted = this.notify(target, domEvent.type, event3D);
+      if (toucheventAccepted) {
+        this.notify(this.lastTarget, 'touchleave', event3D);
+        this.notify(this.lastTarget, 'touchend', event3D);
+      } else {
+        // if target was null or no target has caught our event, fall back
+        target = this.fallbackTarget;
+        if (target !== this.lastTarget) {
+          this.notify(this.lastTarget, 'touchmove', event3D);
+          this.notify(this.lastTarget, 'touchend', event3D);
+        }
+      }
+    }
+
+    // pass through event
+    this.notify(target, domEvent.type, event3D);
+    if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
+      this.dragging = true;
+    }
+    this.lastTarget = target;
+  };
+  /**
+   * Notify the listener of the type of event that occurred.
+   *
+   * @param target - the target of the event
+   * @param type - the type of event that occurred
+   * @param event3D - the 3D mouse even information
+   * @returns if an event was canceled
+   */
+  MouseHandler.prototype.notify = function notify (target, type, event3D) {
+    // ensure the type is set
+    //
+    event3D.type = type;
+
+    // make the event cancelable
+    event3D.cancelBubble = false;
+    event3D.continueBubble = false;
+    event3D.stopPropagation = function() {
+      event3D.cancelBubble = true;
+    };
+
+    // it hit the selectable object but don't highlight
+    event3D.continuePropagation = function () {
+      event3D.continueBubble = true;
+    };
+
+    // walk up graph until event is canceled or root node has been reached
+    event3D.currentTarget = target;
+
+    while (event3D.currentTarget) {
+      // try to fire event on object
+      if (event3D.currentTarget.dispatchEvent
+          && event3D.currentTarget.dispatchEvent instanceof Function) {
+        event3D.currentTarget.dispatchEvent(event3D);
+        if (event3D.cancelBubble) {
+          this.dispatchEvent(event3D);
+          return 0; // Event Accepted
+        }
+        else if(event3D.continueBubble) {
+          return 2; // Event Continued
+        }
+      }
+      // walk up
+      event3D.currentTarget = event3D.currentTarget.parent;
+    }
+
+    return 1; // Event Failed
+  };
+
+  return MouseHandler;
+}(THREE.EventDispatcher));
+
+/**
+ * @fileOverview
+ * @author Russell Toris - rctoris@wpi.edu
+ */
+
+var OccupancyGridNav = /*@__PURE__*/(function (OccupancyGrid) {
+  function OccupancyGridNav(options) {
+    OccupancyGrid.call(this, options);
+    this.handler = options.handler || null;
+    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
+        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
+        'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of MouseHandler
+    
+    
+    if (this.handler){
+      for (var i=0; i < eventNames.length; i++){
+        // Bind all mouse events to the event handler
+        this.addEventListener(eventNames[i], this.handler.mouseEventHandler);
+      }
+      // this.addEventListener('mouseover', this.handler.onMouseOver.bind(this));
+      // this.addEventListener('dblclick', this.handler.onMouseDblClick);
+      // this.addEventListener('mousedown', this.handler.onMouseDown);
+    }
+    
+    // this.addEventListener('mouseover', this.onMouseOver.bind(this));
+    
+  }
+
+  if ( OccupancyGrid ) OccupancyGridNav.__proto__ = OccupancyGrid;
+  OccupancyGridNav.prototype = Object.create( OccupancyGrid && OccupancyGrid.prototype );
+  OccupancyGridNav.prototype.constructor = OccupancyGridNav;
+
+  return OccupancyGridNav;
+}(OccupancyGrid));
+
+/**
  * @fileOverview
  * @author Russell Toris - rctoris@wpi.edu
  */
@@ -55842,6 +56246,9 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
     this.offsetPose = options.offsetPose || new ROSLIB.Pose();
     this.color = options.color || {r:255,g:255,b:255};
     this.opacity = options.opacity || 1.0;
+    this.viewer = options.viewer || null;
+    this.navServerName = options.navServerName || '/move_base';
+    this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
 
     // current grid that is displayed
     this.currentGrid = null;
@@ -55887,10 +56294,21 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
       this.currentGrid.dispose();
     }
 
-    var newGrid = new OccupancyGrid({
+    var grid_handler = new Navigator({
+      ros: this.ros,
+      tfClient: this.tfClient,
+      rootObject: this,
+      serverName: this.navServerName,
+      actionName: this.navActionName,
+      occupancyGridFrameID: message.header.frame_id,
+
+    });
+
+    var newGrid = new OccupancyGridNav({
       message : message,
       color : this.color,
-      opacity : this.opacity
+      opacity : this.opacity,
+      handler: grid_handler,
     });
 
     // check if we care about the scene
@@ -55912,6 +56330,10 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
       this.rootObject.add(this.currentGrid);
     }
 
+    if (this.viewer){
+      this.viewer.addObject(this.sceneNode, true);
+    }
+
     this.emit('change');
 
     // check if we should unsubscribe
@@ -55922,24 +56344,6 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
 
   return OccupancyGridClient;
 }(EventEmitter2));
-
-/**
- * @fileOverview
- * @author Russell Toris - rctoris@wpi.edu
- */
-
-var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
-  function OccupancyGridClientNav(options) {
-    OccupancyGridClient.call(this, options);
-
-  }
-
-  if ( OccupancyGridClient ) OccupancyGridClientNav.__proto__ = OccupancyGridClient;
-  OccupancyGridClientNav.prototype = Object.create( OccupancyGridClient && OccupancyGridClient.prototype );
-  OccupancyGridClientNav.prototype.constructor = OccupancyGridClientNav;
-
-  return OccupancyGridClientNav;
-}(OccupancyGridClient));
 
 /**
  * @fileOverview
@@ -57755,7 +58159,7 @@ var Urdf = /*@__PURE__*/(function (superclass) {
               console.warn('Could not load geometry mesh: '+uri);
             }
           } else {
-            var shapeMesh = this.createShapeMesh(visual, options);
+            var shapeMesh = this.createShapeMesh(visual, colorMaterial, options);
             // Create a scene node with the shape
             var scene = new SceneNode({
               frameID: frameID,
@@ -57774,8 +58178,7 @@ var Urdf = /*@__PURE__*/(function (superclass) {
   if ( superclass ) Urdf.__proto__ = superclass;
   Urdf.prototype = Object.create( superclass && superclass.prototype );
   Urdf.prototype.constructor = Urdf;
-  Urdf.prototype.createShapeMesh = function createShapeMesh (visual, options) {
-    var colorMaterial = null;
+  Urdf.prototype.createShapeMesh = function createShapeMesh (visual, colorMaterial, options) {
     if (!colorMaterial) {
       colorMaterial = makeColorMaterial(0, 0, 0, 1);
     }
@@ -57981,223 +58384,6 @@ Highlighter.prototype.restoreVisibility = function restoreVisibility (scene) {
 /**
  * @fileOverview
  * @author David Gossow - dgossow@willowgarage.com
- */
-
-var MouseHandler = /*@__PURE__*/(function (superclass) {
-  function MouseHandler(options) {
-    superclass.call(this);
-    this.renderer = options.renderer;
-    this.camera = options.camera;
-    this.rootObject = options.rootObject;
-    this.fallbackTarget = options.fallbackTarget;
-    this.lastTarget = this.fallbackTarget;
-    this.dragging = false;
-
-    // listen to DOM events
-    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
-        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
-        'touchleave', 'touchmove' ];
-    this.listeners = {};
-
-    // add event listeners for the associated mouse events
-    eventNames.forEach(function(eventName) {
-      this.listeners[eventName] = this.processDomEvent.bind(this);
-      this.renderer.domElement.addEventListener(eventName, this.listeners[eventName], false);
-    }, this);
-  }
-
-  if ( superclass ) MouseHandler.__proto__ = superclass;
-  MouseHandler.prototype = Object.create( superclass && superclass.prototype );
-  MouseHandler.prototype.constructor = MouseHandler;
-  /**
-   * Process the particular DOM even that has occurred based on the mouse's position in the scene.
-   *
-   * @param domEvent - the DOM event to process
-   */
-  MouseHandler.prototype.processDomEvent = function processDomEvent (domEvent) {
-    // don't deal with the default handler
-    domEvent.preventDefault();
-
-    // compute normalized device coords and 3D mouse ray
-    var target = domEvent.target;
-    var rect = target.getBoundingClientRect();
-    var pos_x, pos_y;
-
-    if(domEvent.type.indexOf('touch') !== -1) {
-      pos_x = 0;
-      pos_y = 0;
-      for(var i=0; i<domEvent.touches.length; ++i) {
-          pos_x += domEvent.touches[i].clientX;
-          pos_y += domEvent.touches[i].clientY;
-      }
-      pos_x /= domEvent.touches.length;
-      pos_y /= domEvent.touches.length;
-    }
-    else {
-  	pos_x = domEvent.clientX;
-  	pos_y = domEvent.clientY;
-    }
-    var left = pos_x - rect.left - target.clientLeft + target.scrollLeft;
-    var top = pos_y - rect.top - target.clientTop + target.scrollTop;
-    var deviceX = left / target.clientWidth * 2 - 1;
-    var deviceY = -top / target.clientHeight * 2 + 1;
-    var mousePos = new THREE.Vector2(deviceX, deviceY);
-
-    var mouseRaycaster = new THREE.Raycaster();
-    mouseRaycaster.linePrecision = 0.001;
-    mouseRaycaster.setFromCamera(mousePos, this.camera);
-    var mouseRay = mouseRaycaster.ray;
-
-    // make our 3d mouse event
-    var event3D = {
-      mousePos : mousePos,
-      mouseRay : mouseRay,
-      domEvent : domEvent,
-      camera : this.camera,
-      intersection : this.lastIntersection
-    };
-
-    // if the mouse leaves the dom element, stop everything
-    if (domEvent.type === 'mouseout') {
-      if (this.dragging) {
-        this.notify(this.lastTarget, 'mouseup', event3D);
-        this.dragging = false;
-      }
-      this.notify(this.lastTarget, 'mouseout', event3D);
-      this.lastTarget = null;
-      return;
-    }
-
-    // if the touch leaves the dom element, stop everything
-    if (domEvent.type === 'touchleave' || domEvent.type === 'touchend') {
-      if (this.dragging) {
-        this.notify(this.lastTarget, 'mouseup', event3D);
-        this.dragging = false;
-      }
-      this.notify(this.lastTarget, 'touchend', event3D);
-      this.lastTarget = null;
-      return;
-    }
-
-    // while the user is holding the mouse down, stay on the same target
-    if (this.dragging) {
-      this.notify(this.lastTarget, domEvent.type, event3D);
-      // for check for right or left mouse button
-      if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
-        this.dragging = false;
-      }
-      return;
-    }
-
-    // in the normal case, we need to check what is under the mouse
-    target = this.lastTarget;
-    var intersections = [];
-    intersections = mouseRaycaster.intersectObject(this.rootObject, true);
-
-    if (intersections.length > 0) {
-      target = intersections[0].object;
-      event3D.intersection = this.lastIntersection = intersections[0];
-    } else {
-      target = this.fallbackTarget;
-    }
-
-    // if the mouse moves from one object to another (or from/to the 'null' object), notify both
-    if (target !== this.lastTarget && domEvent.type.match(/mouse/)) {
-
-      // Event Status. TODO: Make it as enum
-      // 0: Accepted
-      // 1: Failed
-      // 2: Continued
-      var eventStatus = this.notify(target, 'mouseover', event3D);
-      if (eventStatus === 0) {
-        this.notify(this.lastTarget, 'mouseout', event3D);
-      } else if(eventStatus === 1) {
-        // if target was null or no target has caught our event, fall back
-        target = this.fallbackTarget;
-        if (target !== this.lastTarget) {
-          this.notify(target, 'mouseover', event3D);
-          this.notify(this.lastTarget, 'mouseout', event3D);
-        }
-      }
-    }
-
-    // if the finger moves from one object to another (or from/to the 'null' object), notify both
-    if (target !== this.lastTarget && domEvent.type.match(/touch/)) {
-      var toucheventAccepted = this.notify(target, domEvent.type, event3D);
-      if (toucheventAccepted) {
-        this.notify(this.lastTarget, 'touchleave', event3D);
-        this.notify(this.lastTarget, 'touchend', event3D);
-      } else {
-        // if target was null or no target has caught our event, fall back
-        target = this.fallbackTarget;
-        if (target !== this.lastTarget) {
-          this.notify(this.lastTarget, 'touchmove', event3D);
-          this.notify(this.lastTarget, 'touchend', event3D);
-        }
-      }
-    }
-
-    // pass through event
-    this.notify(target, domEvent.type, event3D);
-    if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
-      this.dragging = true;
-    }
-    this.lastTarget = target;
-  };
-  /**
-   * Notify the listener of the type of event that occurred.
-   *
-   * @param target - the target of the event
-   * @param type - the type of event that occurred
-   * @param event3D - the 3D mouse even information
-   * @returns if an event was canceled
-   */
-  MouseHandler.prototype.notify = function notify (target, type, event3D) {
-    // ensure the type is set
-    //
-    event3D.type = type;
-
-    // make the event cancelable
-    event3D.cancelBubble = false;
-    event3D.continueBubble = false;
-    event3D.stopPropagation = function() {
-      event3D.cancelBubble = true;
-    };
-
-    // it hit the selectable object but don't highlight
-    event3D.continuePropagation = function () {
-      event3D.continueBubble = true;
-    };
-
-    // walk up graph until event is canceled or root node has been reached
-    event3D.currentTarget = target;
-
-    while (event3D.currentTarget) {
-      // try to fire event on object
-      if (event3D.currentTarget.dispatchEvent
-          && event3D.currentTarget.dispatchEvent instanceof Function) {
-        event3D.currentTarget.dispatchEvent(event3D);
-        if (event3D.cancelBubble) {
-          this.dispatchEvent(event3D);
-          return 0; // Event Accepted
-        }
-        else if(event3D.continueBubble) {
-          return 2; // Event Continued
-        }
-      }
-      // walk up
-      event3D.currentTarget = event3D.currentTarget.parent;
-    }
-
-    return 1; // Event Failed
-  };
-
-  return MouseHandler;
-}(THREE.EventDispatcher));
-
-/**
- * @fileOverview
- * @author David Gossow - dgossow@willowgarage.com
  * @author Xueqiao Xu - xueqiaoxu@gmail.com
  * @author Mr.doob - http://mrdoob.com
  * @author AlteredQualia - http://alteredqualia.com
@@ -58272,6 +58458,7 @@ var OrbitControls = /*@__PURE__*/(function (superclass) {
      * @param event3D - the 3D event to handle
      */
     function onMouseDown(event3D) {
+      console.log('orbit: mouseDOWN');
       var event = event3D.domEvent;
       event.preventDefault();
 
@@ -58849,4 +59036,4 @@ Viewer.prototype.resize = function resize (width, height) {
   this.renderer.setSize(width, height);
 };
 
-export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridClientNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };
+export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, Navigator, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };

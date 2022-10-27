@@ -56050,6 +56050,444 @@ var ROS3D = (function (exports, ROSLIB) {
 	}
 
 	/**
+	 * @author Russell Toris - rctoris@wpi.edu
+	 * @author Lars Kunze - l.kunze@cs.bham.ac.uk
+	 * @author Raffaello Bonghi - raffaello.bonghi@officinerobotiche.it
+	 * @author Randel
+	 */
+
+	class Navigator extends THREE.Mesh {
+
+	  /**
+	   * A navigator can be used to add click-to-navigate options to an object. If
+	   * withOrientation is set to true, the user can also specify the orientation of
+	   * the robot by clicking at the goal position and pointing into the desired
+	   * direction (while holding the button pressed).
+	   *
+	   * @constructor
+	   * @param options - object with following keys:
+	   *   * ros - the ROSLIB.Ros connection handle
+	   *   * tfClient (optional) - the TF client
+	   *   * robot_pose (optional) - the robot topic or TF to listen position
+	   *   * serverName (optional) - the action server name to use for navigation, like '/move_base'
+	   *   * actionName (optional) - the navigation action name, like 'move_base_msgs/MoveBaseAction'
+	   *   * rootObject (optional) - the root object to add the click listeners to and render robot markers to
+	   *   * withOrientation (optional) - if the Navigator should consider the robot orientation (default: false)
+	   */
+	  
+	  constructor(options) {
+	  
+	    super();
+	    options = options || {};
+	    var ros = options.ros;
+	    this.tfClient = options.tfClient || null;
+	    options.robot_pose || '/robot_pose';
+	    var serverName = options.serverName || '/move_base';
+	    var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
+	    options.withOrientation || false;
+	    options.image;
+	    this.rootObject = options.rootObject;
+	    this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
+
+	    this.goalMarker = null;
+	    this.isActive = true;
+
+	    // binding mouse handlers
+	    // this.onMouseDblClick = this.onMouseDblClickUnbound.bind(this);
+	    // this.onMouseDown = this.onMouseDownUnbound.bind(this);
+
+	    // setup the actionlib client
+	    this.actionClient = new ROSLIB__namespace.ActionClient({
+	      ros : ros,
+	      actionName : actionName,
+	      serverName : serverName
+	    });
+	    
+	    // Since this called by objects other than itself (addeventlistener on OGNav)
+	    this.mouseEventHandler = this.mouseEventHandlerUnbound.bind(this);
+	    
+
+	  };
+
+
+
+	  sendGoal(pose){
+	    // create a goal, use the message type move_base_msgs/MoveBaseAction
+	    var goalMessage = {
+	      target_pose : {
+	        header : {
+	          frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
+	        },
+	        pose : pose
+	      }
+	    };
+	    // Only add "priority_val" on roamer messages since move_base_msgs/MoveBaseAction has no priority,
+	    // will produce error if the message and message type fields do not match
+	    if (this.actionClient.actionName === 'roamer_msgs/MoveBaseAction'){
+	      goalMessage.priority_val = 1;   // Since prio=0 can't override previous prio=0 goals
+	    }
+	    var goal = new ROSLIB__namespace.Goal({
+	      actionClient : this.actionClient,
+	      goalMessage : goalMessage,
+	    });
+	    goal.send();
+	    
+	    this.currentGoal = goal;
+	  };
+
+
+
+	  // onMouseDownUnbound(e){
+	  //   // convert to ROS coordinates
+
+	  //   var poi = e.intersection.point; 
+	  //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+	  //   var pose = new ROSLIB.Pose({
+	  //     position : new ROSLIB.Vector3(coords)
+	  //   });
+	  //   // send the goal
+	  //   this.sendGoal(pose);
+	  //   e.stopPropagation();
+	  //   console.log('nav: mouseDOWN')
+
+	  // };
+
+	  // onMouseDblClickUnbound(e){
+	  //   // convert to ROS coordinates
+
+	  //   var poi = e.intersection.point; 
+	  //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+	  //   var pose = new ROSLIB.Pose({
+	  //     position : new ROSLIB.Vector3(coords)
+	  //   });
+	  //   // send the goal
+	  //   this.sendGoal(pose);
+	  //   e.stopPropagation();
+	  //   console.log('nav: mouseDBLCLICK')
+
+	  // };
+
+
+	  mouseEventHandlerUnbound(event3D){
+	    // only handle mouse events when active AND with left mouse button is pressed
+	    if (this.isActive && (event3D.domEvent.button === 0)){
+	      event3D.stopPropagation();
+	      switch(event3D.domEvent.type){
+	        case 'mousedown':
+	          var poi = event3D.intersection.point; 
+	          var coords = new ROSLIB__namespace.Vector3({x: poi.x, y: poi.y, z: 0});
+	          var pose = new ROSLIB__namespace.Pose({
+	            position : new ROSLIB__namespace.Vector3(coords)
+	          });
+	          // send the goal
+	          this.sendGoal(pose);
+	          console.log('nav: mouseDOWN');
+	          break;
+
+	        case 'dblclick':
+	          var poi = event3D.intersection.point; 
+	          var coords = new ROSLIB__namespace.Vector3({x: poi.x, y: poi.y, z: 0});
+	          var pose = new ROSLIB__namespace.Pose({
+	            position : new ROSLIB__namespace.Vector3(coords)
+	          });
+	          // send the goal
+	          this.sendGoal(pose);
+	          console.log('nav: mouseDBLCLICK');
+
+	        default:
+	          event3D.stopPropagation();      // If no one accepts, UNDO the stopPropagation()
+	      }
+	    }
+	  }
+
+
+	  activate(event3D){
+	    this.isActive = true;
+	  }
+
+	  deactivate(event3D){
+	    this.isActive = false;
+	  }
+
+	  toggleActivation(event3D){
+	    this.isActive = !this.isActive;
+	    console.log('Navigator isActive: ' + this.isActive);
+	  }
+	}
+
+	/**
+	 * @fileOverview
+	 * @author David Gossow - dgossow@willowgarage.com
+	 */
+
+	class MouseHandler extends THREE.EventDispatcher {
+
+	  /**
+	   * A handler for mouse events within a 3D viewer.
+	   *
+	   * @constructor
+	   * @param options - object with following keys:
+	   *
+	   *   * renderer - the main renderer
+	   *   * camera - the main camera in the scene
+	   *   * rootObject - the root object to check for mouse events
+	   *   * fallbackTarget - the fallback target, e.g., the camera controls
+	   */
+	  constructor(options) {
+	    super();
+	    this.renderer = options.renderer;
+	    this.camera = options.camera;
+	    this.rootObject = options.rootObject;
+	    this.fallbackTarget = options.fallbackTarget;
+	    this.lastTarget = this.fallbackTarget;
+	    this.dragging = false;
+
+	    // listen to DOM events
+	    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
+	        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
+	        'touchleave', 'touchmove' ];
+	    this.listeners = {};
+
+	    // add event listeners for the associated mouse events
+	    eventNames.forEach(function(eventName) {
+	      this.listeners[eventName] = this.processDomEvent.bind(this);
+	      this.renderer.domElement.addEventListener(eventName, this.listeners[eventName], false);
+	    }, this);
+	  };
+
+	  /**
+	   * Process the particular DOM even that has occurred based on the mouse's position in the scene.
+	   *
+	   * @param domEvent - the DOM event to process
+	   */
+	  processDomEvent(domEvent) {
+	    // don't deal with the default handler
+	    domEvent.preventDefault();
+
+	    // compute normalized device coords and 3D mouse ray
+	    var target = domEvent.target;
+	    var rect = target.getBoundingClientRect();
+	    var pos_x, pos_y;
+
+	    if(domEvent.type.indexOf('touch') !== -1) {
+	      pos_x = 0;
+	      pos_y = 0;
+	      for(var i=0; i<domEvent.touches.length; ++i) {
+	          pos_x += domEvent.touches[i].clientX;
+	          pos_y += domEvent.touches[i].clientY;
+	      }
+	      pos_x /= domEvent.touches.length;
+	      pos_y /= domEvent.touches.length;
+	    }
+	    else {
+	  	pos_x = domEvent.clientX;
+	  	pos_y = domEvent.clientY;
+	    }
+	    var left = pos_x - rect.left - target.clientLeft + target.scrollLeft;
+	    var top = pos_y - rect.top - target.clientTop + target.scrollTop;
+	    var deviceX = left / target.clientWidth * 2 - 1;
+	    var deviceY = -top / target.clientHeight * 2 + 1;
+	    var mousePos = new THREE.Vector2(deviceX, deviceY);
+
+	    var mouseRaycaster = new THREE.Raycaster();
+	    mouseRaycaster.linePrecision = 0.001;
+	    mouseRaycaster.setFromCamera(mousePos, this.camera);
+	    var mouseRay = mouseRaycaster.ray;
+
+	    // make our 3d mouse event
+	    var event3D = {
+	      mousePos : mousePos,
+	      mouseRay : mouseRay,
+	      domEvent : domEvent,
+	      camera : this.camera,
+	      intersection : this.lastIntersection
+	    };
+
+	    // if the mouse leaves the dom element, stop everything
+	    if (domEvent.type === 'mouseout') {
+	      if (this.dragging) {
+	        this.notify(this.lastTarget, 'mouseup', event3D);
+	        this.dragging = false;
+	      }
+	      this.notify(this.lastTarget, 'mouseout', event3D);
+	      this.lastTarget = null;
+	      return;
+	    }
+
+	    // if the touch leaves the dom element, stop everything
+	    if (domEvent.type === 'touchleave' || domEvent.type === 'touchend') {
+	      if (this.dragging) {
+	        this.notify(this.lastTarget, 'mouseup', event3D);
+	        this.dragging = false;
+	      }
+	      this.notify(this.lastTarget, 'touchend', event3D);
+	      this.lastTarget = null;
+	      return;
+	    }
+
+	    // while the user is holding the mouse down, stay on the same target
+	    if (this.dragging) {
+	      this.notify(this.lastTarget, domEvent.type, event3D);
+	      // for check for right or left mouse button
+	      if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
+	        this.dragging = false;
+	      }
+	      return;
+	    }
+
+	    // in the normal case, we need to check what is under the mouse
+	    target = this.lastTarget;
+	    var intersections = [];
+	    intersections = mouseRaycaster.intersectObject(this.rootObject, true);
+
+	    if (intersections.length > 0) {
+	      target = intersections[0].object;
+	      event3D.intersection = this.lastIntersection = intersections[0];
+	    } else {
+	      target = this.fallbackTarget;
+	    }
+
+	    // if the mouse moves from one object to another (or from/to the 'null' object), notify both
+	    if (target !== this.lastTarget && domEvent.type.match(/mouse/)) {
+
+	      // Event Status. TODO: Make it as enum
+	      // 0: Accepted
+	      // 1: Failed
+	      // 2: Continued
+	      var eventStatus = this.notify(target, 'mouseover', event3D);
+	      if (eventStatus === 0) {
+	        this.notify(this.lastTarget, 'mouseout', event3D);
+	      } else if(eventStatus === 1) {
+	        // if target was null or no target has caught our event, fall back
+	        target = this.fallbackTarget;
+	        if (target !== this.lastTarget) {
+	          this.notify(target, 'mouseover', event3D);
+	          this.notify(this.lastTarget, 'mouseout', event3D);
+	        }
+	      }
+	    }
+
+	    // if the finger moves from one object to another (or from/to the 'null' object), notify both
+	    if (target !== this.lastTarget && domEvent.type.match(/touch/)) {
+	      var toucheventAccepted = this.notify(target, domEvent.type, event3D);
+	      if (toucheventAccepted) {
+	        this.notify(this.lastTarget, 'touchleave', event3D);
+	        this.notify(this.lastTarget, 'touchend', event3D);
+	      } else {
+	        // if target was null or no target has caught our event, fall back
+	        target = this.fallbackTarget;
+	        if (target !== this.lastTarget) {
+	          this.notify(this.lastTarget, 'touchmove', event3D);
+	          this.notify(this.lastTarget, 'touchend', event3D);
+	        }
+	      }
+	    }
+
+	    // pass through event
+	    this.notify(target, domEvent.type, event3D);
+	    if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
+	      this.dragging = true;
+	    }
+	    this.lastTarget = target;
+	  };
+
+	  /**
+	   * Notify the listener of the type of event that occurred.
+	   *
+	   * @param target - the target of the event
+	   * @param type - the type of event that occurred
+	   * @param event3D - the 3D mouse even information
+	   * @returns if an event was canceled
+	   */
+	  notify(target, type, event3D) {
+	    // ensure the type is set
+	    //
+	    event3D.type = type;
+
+	    // make the event cancelable
+	    event3D.cancelBubble = false;
+	    event3D.continueBubble = false;
+	    event3D.stopPropagation = function() {
+	      event3D.cancelBubble = true;
+	    };
+
+	    // it hit the selectable object but don't highlight
+	    event3D.continuePropagation = function () {
+	      event3D.continueBubble = true;
+	    };
+
+	    // walk up graph until event is canceled or root node has been reached
+	    event3D.currentTarget = target;
+
+	    while (event3D.currentTarget) {
+	      // try to fire event on object
+	      if (event3D.currentTarget.dispatchEvent
+	          && event3D.currentTarget.dispatchEvent instanceof Function) {
+	        event3D.currentTarget.dispatchEvent(event3D);
+	        if (event3D.cancelBubble) {
+	          this.dispatchEvent(event3D);
+	          return 0; // Event Accepted
+	        }
+	        else if(event3D.continueBubble) {
+	          return 2; // Event Continued
+	        }
+	      }
+	      // walk up
+	      event3D.currentTarget = event3D.currentTarget.parent;
+	    }
+
+	    return 1; // Event Failed
+	  };
+	}
+
+	/**
+	 * @fileOverview
+	 * @author Russell Toris - rctoris@wpi.edu
+	 */
+
+	class OccupancyGridNav extends OccupancyGrid {
+
+	  /**
+	   * An OccupancyGridNav can convert a ROS occupancy grid message into a THREE object.
+	   *
+	   * @constructor
+	   * @param options - object with following keys:
+	   *
+	   *   * message - the occupancy grid message
+	   *   * color (optional) - color of the visualized grid
+	   *   * opacity (optional) - opacity of the visualized grid (0.0 == fully transparent, 1.0 == opaque)
+	   */
+	  constructor(options) {
+	    super(options);
+	    this.handler = options.handler || null;
+	    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
+	        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
+	        'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of MouseHandler
+	    
+	    
+	    if (this.handler){
+	      for (var i=0; i < eventNames.length; i++){
+	        // Bind all mouse events to the event handler
+	        this.addEventListener(eventNames[i], this.handler.mouseEventHandler);
+	      }
+	      // this.addEventListener('mouseover', this.handler.onMouseOver.bind(this));
+	      // this.addEventListener('dblclick', this.handler.onMouseDblClick);
+	      // this.addEventListener('mousedown', this.handler.onMouseDown);
+	    }
+	    
+	    // this.addEventListener('mouseover', this.onMouseOver.bind(this));
+	    
+	  };
+
+
+
+	  // for testing only RANDEL
+	  // onMouseOver(e){
+	  //   console.log(e);
+	  // }
+	}
+
+	/**
 	 * @fileOverview
 	 * @author Russell Toris - rctoris@wpi.edu
 	 */
@@ -56088,6 +56526,9 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.offsetPose = options.offsetPose || new ROSLIB__namespace.Pose();
 	    this.color = options.color || {r:255,g:255,b:255};
 	    this.opacity = options.opacity || 1.0;
+	    this.viewer = options.viewer || null;
+	    this.navServerName = options.navServerName || '/move_base';
+	    this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
 
 	    // current grid that is displayed
 	    this.currentGrid = null;
@@ -56132,10 +56573,21 @@ var ROS3D = (function (exports, ROSLIB) {
 	      this.currentGrid.dispose();
 	    }
 
-	    var newGrid = new OccupancyGrid({
+	    var grid_handler = new Navigator({
+	      ros: this.ros,
+	      tfClient: this.tfClient,
+	      rootObject: this,
+	      serverName: this.navServerName,
+	      actionName: this.navActionName,
+	      occupancyGridFrameID: message.header.frame_id,
+
+	    });
+
+	    var newGrid = new OccupancyGridNav({
 	      message : message,
 	      color : this.color,
-	      opacity : this.opacity
+	      opacity : this.opacity,
+	      handler: grid_handler,
 	    });
 
 	    // check if we care about the scene
@@ -56157,45 +56609,16 @@ var ROS3D = (function (exports, ROSLIB) {
 	      this.rootObject.add(this.currentGrid);
 	    }
 
+	    if (this.viewer){
+	      this.viewer.addObject(this.sceneNode, true);
+	    }
+
 	    this.emit('change');
 
 	    // check if we should unsubscribe
 	    if (!this.continuous) {
 	      this.rosTopic.unsubscribe(this.processMessage);
 	    }
-	  };
-	}
-
-	/**
-	 * @fileOverview
-	 * @author Russell Toris - rctoris@wpi.edu
-	 */
-
-	class OccupancyGridClientNav extends OccupancyGridClient {
-
-	  /**
-	   * An occupancy grid client that listens to a given map topic.
-	   *
-	   * Emits the following events:
-	   *
-	   *  * 'change' - there was an update or change in the marker
-	   *
-	   * @constructor
-	   * @param options - object with following keys:
-	   *
-	   *   * ros - the ROSLIB.Ros connection handle
-	   *   * topic (optional) - the map topic to listen to
-	   *   * continuous (optional) - if the map should be continuously loaded (e.g., for SLAM)
-	   *   * tfClient (optional) - the TF client handle to use for a scene node
-	   *   * compression (optional) - message compression (default: 'cbor')
-	   *   * rootObject (optional) - the root object to add this marker to
-	   *   * offsetPose (optional) - offset pose of the grid visualization, e.g. for z-offset (ROSLIB.Pose type)
-	   *   * color (optional) - color of the visualized grid
-	   *   * opacity (optional) - opacity of the visualized grid (0.0 == fully transparent, 1.0 == opaque)
-	   */
-	  constructor(options) {
-	    super(options);
-
 	  };
 	}
 
@@ -58252,7 +58675,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	              console.warn('Could not load geometry mesh: '+uri);
 	            }
 	          } else {
-	            var shapeMesh = this.createShapeMesh(visual, options);
+	            var shapeMesh = this.createShapeMesh(visual, colorMaterial, options);
 	            // Create a scene node with the shape
 	            var scene = new SceneNode({
 	              frameID: frameID,
@@ -58268,8 +58691,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    }
 	  };
 
-	  createShapeMesh(visual, options) {
-	    var colorMaterial = null;
+	  createShapeMesh(visual, colorMaterial, options) {
 	    if (!colorMaterial) {
 	      colorMaterial = makeColorMaterial(0, 0, 0, 1);
 	    }
@@ -58513,231 +58935,6 @@ var ROS3D = (function (exports, ROSLIB) {
 	/**
 	 * @fileOverview
 	 * @author David Gossow - dgossow@willowgarage.com
-	 */
-
-	class MouseHandler extends THREE.EventDispatcher {
-
-	  /**
-	   * A handler for mouse events within a 3D viewer.
-	   *
-	   * @constructor
-	   * @param options - object with following keys:
-	   *
-	   *   * renderer - the main renderer
-	   *   * camera - the main camera in the scene
-	   *   * rootObject - the root object to check for mouse events
-	   *   * fallbackTarget - the fallback target, e.g., the camera controls
-	   */
-	  constructor(options) {
-	    super();
-	    this.renderer = options.renderer;
-	    this.camera = options.camera;
-	    this.rootObject = options.rootObject;
-	    this.fallbackTarget = options.fallbackTarget;
-	    this.lastTarget = this.fallbackTarget;
-	    this.dragging = false;
-
-	    // listen to DOM events
-	    var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
-	        'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
-	        'touchleave', 'touchmove' ];
-	    this.listeners = {};
-
-	    // add event listeners for the associated mouse events
-	    eventNames.forEach(function(eventName) {
-	      this.listeners[eventName] = this.processDomEvent.bind(this);
-	      this.renderer.domElement.addEventListener(eventName, this.listeners[eventName], false);
-	    }, this);
-	  };
-
-	  /**
-	   * Process the particular DOM even that has occurred based on the mouse's position in the scene.
-	   *
-	   * @param domEvent - the DOM event to process
-	   */
-	  processDomEvent(domEvent) {
-	    // don't deal with the default handler
-	    domEvent.preventDefault();
-
-	    // compute normalized device coords and 3D mouse ray
-	    var target = domEvent.target;
-	    var rect = target.getBoundingClientRect();
-	    var pos_x, pos_y;
-
-	    if(domEvent.type.indexOf('touch') !== -1) {
-	      pos_x = 0;
-	      pos_y = 0;
-	      for(var i=0; i<domEvent.touches.length; ++i) {
-	          pos_x += domEvent.touches[i].clientX;
-	          pos_y += domEvent.touches[i].clientY;
-	      }
-	      pos_x /= domEvent.touches.length;
-	      pos_y /= domEvent.touches.length;
-	    }
-	    else {
-	  	pos_x = domEvent.clientX;
-	  	pos_y = domEvent.clientY;
-	    }
-	    var left = pos_x - rect.left - target.clientLeft + target.scrollLeft;
-	    var top = pos_y - rect.top - target.clientTop + target.scrollTop;
-	    var deviceX = left / target.clientWidth * 2 - 1;
-	    var deviceY = -top / target.clientHeight * 2 + 1;
-	    var mousePos = new THREE.Vector2(deviceX, deviceY);
-
-	    var mouseRaycaster = new THREE.Raycaster();
-	    mouseRaycaster.linePrecision = 0.001;
-	    mouseRaycaster.setFromCamera(mousePos, this.camera);
-	    var mouseRay = mouseRaycaster.ray;
-
-	    // make our 3d mouse event
-	    var event3D = {
-	      mousePos : mousePos,
-	      mouseRay : mouseRay,
-	      domEvent : domEvent,
-	      camera : this.camera,
-	      intersection : this.lastIntersection
-	    };
-
-	    // if the mouse leaves the dom element, stop everything
-	    if (domEvent.type === 'mouseout') {
-	      if (this.dragging) {
-	        this.notify(this.lastTarget, 'mouseup', event3D);
-	        this.dragging = false;
-	      }
-	      this.notify(this.lastTarget, 'mouseout', event3D);
-	      this.lastTarget = null;
-	      return;
-	    }
-
-	    // if the touch leaves the dom element, stop everything
-	    if (domEvent.type === 'touchleave' || domEvent.type === 'touchend') {
-	      if (this.dragging) {
-	        this.notify(this.lastTarget, 'mouseup', event3D);
-	        this.dragging = false;
-	      }
-	      this.notify(this.lastTarget, 'touchend', event3D);
-	      this.lastTarget = null;
-	      return;
-	    }
-
-	    // while the user is holding the mouse down, stay on the same target
-	    if (this.dragging) {
-	      this.notify(this.lastTarget, domEvent.type, event3D);
-	      // for check for right or left mouse button
-	      if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
-	        this.dragging = false;
-	      }
-	      return;
-	    }
-
-	    // in the normal case, we need to check what is under the mouse
-	    target = this.lastTarget;
-	    var intersections = [];
-	    intersections = mouseRaycaster.intersectObject(this.rootObject, true);
-
-	    if (intersections.length > 0) {
-	      target = intersections[0].object;
-	      event3D.intersection = this.lastIntersection = intersections[0];
-	    } else {
-	      target = this.fallbackTarget;
-	    }
-
-	    // if the mouse moves from one object to another (or from/to the 'null' object), notify both
-	    if (target !== this.lastTarget && domEvent.type.match(/mouse/)) {
-
-	      // Event Status. TODO: Make it as enum
-	      // 0: Accepted
-	      // 1: Failed
-	      // 2: Continued
-	      var eventStatus = this.notify(target, 'mouseover', event3D);
-	      if (eventStatus === 0) {
-	        this.notify(this.lastTarget, 'mouseout', event3D);
-	      } else if(eventStatus === 1) {
-	        // if target was null or no target has caught our event, fall back
-	        target = this.fallbackTarget;
-	        if (target !== this.lastTarget) {
-	          this.notify(target, 'mouseover', event3D);
-	          this.notify(this.lastTarget, 'mouseout', event3D);
-	        }
-	      }
-	    }
-
-	    // if the finger moves from one object to another (or from/to the 'null' object), notify both
-	    if (target !== this.lastTarget && domEvent.type.match(/touch/)) {
-	      var toucheventAccepted = this.notify(target, domEvent.type, event3D);
-	      if (toucheventAccepted) {
-	        this.notify(this.lastTarget, 'touchleave', event3D);
-	        this.notify(this.lastTarget, 'touchend', event3D);
-	      } else {
-	        // if target was null or no target has caught our event, fall back
-	        target = this.fallbackTarget;
-	        if (target !== this.lastTarget) {
-	          this.notify(this.lastTarget, 'touchmove', event3D);
-	          this.notify(this.lastTarget, 'touchend', event3D);
-	        }
-	      }
-	    }
-
-	    // pass through event
-	    this.notify(target, domEvent.type, event3D);
-	    if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
-	      this.dragging = true;
-	    }
-	    this.lastTarget = target;
-	  };
-
-	  /**
-	   * Notify the listener of the type of event that occurred.
-	   *
-	   * @param target - the target of the event
-	   * @param type - the type of event that occurred
-	   * @param event3D - the 3D mouse even information
-	   * @returns if an event was canceled
-	   */
-	  notify(target, type, event3D) {
-	    // ensure the type is set
-	    //
-	    event3D.type = type;
-
-	    // make the event cancelable
-	    event3D.cancelBubble = false;
-	    event3D.continueBubble = false;
-	    event3D.stopPropagation = function() {
-	      event3D.cancelBubble = true;
-	    };
-
-	    // it hit the selectable object but don't highlight
-	    event3D.continuePropagation = function () {
-	      event3D.continueBubble = true;
-	    };
-
-	    // walk up graph until event is canceled or root node has been reached
-	    event3D.currentTarget = target;
-
-	    while (event3D.currentTarget) {
-	      // try to fire event on object
-	      if (event3D.currentTarget.dispatchEvent
-	          && event3D.currentTarget.dispatchEvent instanceof Function) {
-	        event3D.currentTarget.dispatchEvent(event3D);
-	        if (event3D.cancelBubble) {
-	          this.dispatchEvent(event3D);
-	          return 0; // Event Accepted
-	        }
-	        else if(event3D.continueBubble) {
-	          return 2; // Event Continued
-	        }
-	      }
-	      // walk up
-	      event3D.currentTarget = event3D.currentTarget.parent;
-	    }
-
-	    return 1; // Event Failed
-	  };
-	}
-
-	/**
-	 * @fileOverview
-	 * @author David Gossow - dgossow@willowgarage.com
 	 * @author Xueqiao Xu - xueqiaoxu@gmail.com
 	 * @author Mr.doob - http://mrdoob.com
 	 * @author AlteredQualia - http://alteredqualia.com
@@ -58829,6 +59026,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	     * @param event3D - the 3D event to handle
 	     */
 	    function onMouseDown(event3D) {
+	      console.log('orbit: mouseDOWN');
 	      var event = event3D.domEvent;
 	      event.preventDefault();
 
@@ -59488,11 +59686,12 @@ var ROS3D = (function (exports, ROSLIB) {
 	exports.MeshResource = MeshResource;
 	exports.MouseHandler = MouseHandler;
 	exports.NavSatFix = NavSatFix;
+	exports.Navigator = Navigator;
 	exports.OcTree = OcTree;
 	exports.OcTreeClient = OcTreeClient;
 	exports.OccupancyGrid = OccupancyGrid;
 	exports.OccupancyGridClient = OccupancyGridClient;
-	exports.OccupancyGridClientNav = OccupancyGridClientNav;
+	exports.OccupancyGridNav = OccupancyGridNav;
 	exports.Odometry = Odometry;
 	exports.OrbitControls = OrbitControls;
 	exports.Path = Path;
