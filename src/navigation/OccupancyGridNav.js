@@ -16,6 +16,8 @@
 ROS3D.OccupancyGridNav = function(options) {
   ROS3D.OccupancyGrid.call(this, options);
   this.handler = options.handler || null;
+  this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
+
   var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
       'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
       'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of ROS3D.MouseHandler

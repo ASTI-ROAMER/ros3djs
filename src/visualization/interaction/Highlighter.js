@@ -119,8 +119,10 @@ ROS3D.Highlighter.prototype.makeHighlightedVisible = function (scene) {
   for (var uuid in this.hoverObjs) {
     var selectedObject = this.hoverObjs[uuid];
     // Make each selected object and all of its children visible
-    selectedObject.visible = true;
-    selectedObject.traverse(makeVisible);
+    if (!selectedObject.excludeFromHighlight){      // RANDEL don't highlight if this is true
+      selectedObject.visible = true;
+      selectedObject.traverse(makeVisible);
+    }
   }
 };
 
