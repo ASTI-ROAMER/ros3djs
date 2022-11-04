@@ -83,13 +83,13 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
     this.currentGrid.dispose();
   }
 
-  var grid_handler = new ROS3D.Navigator({
+  this.navigator = new ROS3D.Navigator({
     ros: this.ros,
     tfClient: this.tfClient,
     rootObject: this,
     serverName: this.navServerName,
     actionName: this.navActionName,
-    occupancyGridFrameID: message.header.frame_id,
+    occupancyGridFrameID: message.header.frame_id,      // this should be the same frame id as OccupancyGridNav
 
   });
 
@@ -97,7 +97,7 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
     message : message,
     color : this.color,
     opacity : this.opacity,
-    handler: grid_handler,
+    navigator: this.navigator,
   });
 
   // check if we care about the scene
@@ -110,16 +110,20 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
         object : newGrid,
         pose : this.offsetPose
       });
+      this.sceneNode.add(this.navigator);
       this.rootObject.add(this.sceneNode);
     } else {
       this.sceneNode.add(this.currentGrid);
+      this.sceneNode.add(this.navigator);
     }
   } else {
     this.sceneNode = this.currentGrid = newGrid;
     this.rootObject.add(this.currentGrid);
+    this.rootObject.add(this.navigator);
   }
 
   if (this.viewer){
+    // add sceneNode to viewer.selectableObjects
     this.viewer.addObject(this.sceneNode, true);
   }
 

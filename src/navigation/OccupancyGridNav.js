@@ -1,47 +1,35 @@
 /**
  * @fileOverview
- * @author Russell Toris - rctoris@wpi.edu
+ * @author Randel Capati - randelmc21@gmail
  */
 
 /**
  * An OccupancyGridNav can convert a ROS occupancy grid message into a THREE object.
+ * This is an extension of OccupancyGrid, with an additional click handler [navigator].
  *
  * @constructor
  * @param options - object with following keys:
  *
- *   * message - the occupancy grid message
- *   * color (optional) - color of the visualized grid
- *   * opacity (optional) - opacity of the visualized grid (0.0 == fully transparent, 1.0 == opaque)
+ *   * options - same options as OccupancyGrid, REFER TO IT for options
+ *   * navigator (optional) - a ROS3D.Navigator object, this makes the robot move when you click on the map.
  */
 ROS3D.OccupancyGridNav = function(options) {
   ROS3D.OccupancyGrid.call(this, options);
-  this.handler = options.handler || null;
+  this.navigator = options.navigator || null;
   this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
 
   var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
       'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
       'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of ROS3D.MouseHandler
   
-  
-  if (this.handler){
+  if (this.navigator){
     for (var i=0; i < eventNames.length; i++){
-      // Bind all mouse events to the event handler
-      this.addEventListener(eventNames[i], this.handler.mouseEventHandler);
+      // Bind all mouse events to the event handler (Navigator), if it exists.
+      this.addEventListener(eventNames[i], this.navigator.mouseEventHandler);
     };
-
-    // this.addEventListener('mouseover', this.handler.onMouseOver.bind(this));
-    // this.addEventListener('dblclick', this.handler.onMouseDblClick);
-    // this.addEventListener('mousedown', this.handler.onMouseDown);
   }
-  
-  // this.addEventListener('mouseover', this.onMouseOver.bind(this));
-  
 };
 
 
 ROS3D.OccupancyGridNav.prototype.__proto__ = ROS3D.OccupancyGrid.prototype;
 
-// for testing only RANDEL
-// ROS3D.OccupancyGridNav.prototype.onMouseOver = function(e){
-//   console.log(e);
-// }
