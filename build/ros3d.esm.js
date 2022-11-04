@@ -55825,296 +55825,103 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
 }(THREE.Mesh));
 
 /**
- * @author Randel Capati - randelmc21@gmail.com
+ * @fileOverview
+ * @author Russell Toris - rctoris@wpi.edu
  */
 
-var Navigator = /*@__PURE__*/(function (superclass) {
-  function Navigator(options) {
-    superclass.call(this);
+var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
+  function OccupancyGridClient(options) {
+    EventEmitter2.call(this);
     options = options || {};
-    var ros = options.ros;
-    this.rootObject = options.rootObject;
-    this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
-    var serverName = options.serverName || '/move_base';
-    var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
-    this.tfClient = options.tfClient || null;
-    this.color = options.color || 0xcc00ff;
-    this.intermediateColor = options.intermediateColor || 0x8f00b3;
+    this.ros = options.ros;
+    this.topicName = options.topic || '/map';
+    this.compression = options.compression || 'cbor';
+    this.continuous = options.continuous;
+    this.tfClient = options.tfClient;
+    this.rootObject = options.rootObject || new THREE.Object3D();
+    this.offsetPose = options.offsetPose || new ROSLIB.Pose();
+    this.color = options.color || {r:255,g:255,b:255};
+    this.opacity = options.opacity || 1.0;
 
-    this.isActive = true;                           // toggle this if you want navigation or not
+    // current grid that is displayed
+    this.currentGrid = null;
 
-    this.mouseDownPos = null;                       // roslib.Vector3 pos
-    this.mouseDown = false;                         // if mousedown was previously detected
-    this.currentGoal = null;                        // action goal message
-    this.goalMarkerOptions = {color: this.color};
-    this.goalMarker = null;
-
-    // setup the actionlib client
-    this.actionClient = new ROSLIB.ActionClient({
-      ros : ros,
-      actionName : actionName,
-      serverName : serverName
-    });
-
-    
-    // Since this is called by objects other than itself (addeventlistener on OGNav)
-    this.mouseEventHandler = this.mouseEventHandlerUnbound.bind(this);
-    
-
+    // subscribe to the topic
+    this.rosTopic = undefined;
+    this.subscribe();
   }
 
-  if ( superclass ) Navigator.__proto__ = superclass;
-  Navigator.prototype = Object.create( superclass && superclass.prototype );
-  Navigator.prototype.constructor = Navigator;
-
-  Navigator.prototype.sendGoal = function sendGoal (pose){
-    // create a goal, use the message type move_base_msgs/MoveBaseAction
-    var goalMessage = {
-      target_pose : {
-        header : {
-          frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
-        },
-        pose : pose
-      }
-    };
-    // Only add "priority_val" on roamer messages since move_base_msgs/MoveBaseAction has no priority,
-    // will produce error if the message and message type fields do not match
-    if (this.actionClient.actionName === 'roamer_msgs/MoveBaseAction'){
-      goalMessage.priority_val = 1;   // Since prio=0 can't override previous prio=0 goals
+  if ( EventEmitter2 ) OccupancyGridClient.__proto__ = EventEmitter2;
+  OccupancyGridClient.prototype = Object.create( EventEmitter2 && EventEmitter2.prototype );
+  OccupancyGridClient.prototype.constructor = OccupancyGridClient;
+  OccupancyGridClient.prototype.unsubscribe = function unsubscribe (){
+    if(this.rosTopic){
+      this.rosTopic.unsubscribe(this.processMessage);
     }
-    var goal = new ROSLIB.Goal({
-      actionClient : this.actionClient,
-      goalMessage : goalMessage,
+  };
+  OccupancyGridClient.prototype.subscribe = function subscribe (){
+    this.unsubscribe();
+
+    // subscribe to the topic
+    this.rosTopic = new ROSLIB.Topic({
+      ros : this.ros,
+      name : this.topicName,
+      messageType : 'nav_msgs/OccupancyGrid',
+      queue_length : 1,
+      compression : this.compression
     });
-    goal.send();
-    console.log('nav: pose sent');
-    
-    this.currentGoal = goal;
-
-    // update marker
-    this.updateGoalMarker(pose.position, pose.orientation);
-
-    // remove old marker first
-    // if (this.goalMarker !== null){
-    //   this.remove(this.goalMarker);
-    // }
-
-    // this.goalMarkerOptions.origin  = new THREE.Vector3( pose.position.x, pose.position.y, pose.position.z);
-    // this.goalMarkerOptions.rot = new THREE.Quaternion(pose.orientation.x, pose.orientation.y, 
-    //   pose.orientation.z, pose.orientation.w);
-    // this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
-    // this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
-    // this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: this.color});
-
-    // this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
-    // this.add(this.goalMarker);
-    // // this.rootObject.forceUpdate();
-    // // this.rootObject.sceneNode.add(this.goalMarker);
-    // this.rootObject.emit('change');
+    this.sceneNode = null;
+    this.rosTopic.subscribe(this.processMessage.bind(this));
   };
-
-  Navigator.prototype.updateGoalMarker = function updateGoalMarker (pos, orientation, color){
-    // remove old marker first
-    if (this.goalMarker !== null){
-      this.remove(this.goalMarker);
-    }
-    var c = color || this.color;
-
-    this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
-    this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
-    this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
-    this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
-    this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
-
-    this.goalMarker = new Arrow(this.goalMarkerOptions);
-    this.add(this.goalMarker);
-
-    this.rootObject.emit('change');
-  };
-
-
-  // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
-  Navigator.prototype.calculateOrientation = function calculateOrientation (p1, p2){
-    var xDelta = p2.x - p1.x;
-    var yDelta = p2.y - p1.y;
-    // var zDelta = p2.z - p1.z;
-    if (xDelta === 0.0 && yDelta === 0.0){
-      console.log('nav ori: same down and up point');
-    }
-    
-    // calc orientation from mouseDownPos and mouseUpPos
-    var thetaRadians  = Math.atan2(xDelta,yDelta);
-
-    if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
-      thetaRadians += (3 * Math.PI / 2);
-    } else {
-      thetaRadians -= (Math.PI/2);
-    }
-
-    var qz =  Math.sin(-thetaRadians/2.0);
-    var qw =  Math.cos(-thetaRadians/2.0);
-
-    return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
-  };
-
-
-  Navigator.prototype.mouseEventHandlerUnbound = function mouseEventHandlerUnbound (event3D){
-    // only handle mouse events when active
-    // 0: Accepted    , so either stop propagation or don't handle it
-    // 1: Failed
-    // 2: Continued
-    // if (this.isActive && (event3D.domEvent.button === 0) && (event3D.domEvent.buttons === 1)){
-    if (this.isActive){
-      // var poi = event3D.intersection.point; 
-
-      // check event3D.type (handled by MouseHandler), !!!NOT!!! event3D.domEvent.type
-      // so that target will not be fallbackTarget (which is OrbitControl)
-      switch(event3D.type){
-        case 'mouseover':
-          // accept a mouseover, as we need it in MouseHandler line 138
-          // but only accept it if it is a left mouse click
-          // we do this so that middle/wheel and right click events are not accepted, and instead caught by camera
-          // if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 && event3D.domEvent.buttons === 1){
-          if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0){
-            event3D.stopPropagation();
-          }
-          break;
-          
-        case 'mousedown':
-          // only handle mousedown for left mouse button (main button)
-          // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
-          // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
-          if ((event3D.domEvent.button === 0) && (event3D.domEvent.buttons === 1)){
-            var poi = event3D.intersection.point; 
-            console.log('nav: mouseDOWN');
-            this.mouseDownPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-            this.mouseDown = true;
-
-            event3D.stopPropagation();
-          } 
-          break;
-
-        // case 'dblclick':
-        //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-        //   var pose = new ROSLIB.Pose({
-        //     position : new ROSLIB.Vector3(coords)
-        //   });
-        //   // send the goal
-        //   this.sendGoal(pose);
-        //   console.log('nav: mouseDBLCLICK');
-
-        case 'mouseout':
-        case 'mouseup':
-          // mouse up for main button only (left button)
-          if (this.mouseDown && (event3D.domEvent.button === 0)  ){
-            // reset
-            this.mouseDown = false;
-
-            // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
-            // but we need the mouse UP position
-            var poi = this.calculateCurrentPOI(event3D);
-
-            // get pos on mouse up/out
-            var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-
-            var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
-
-
-
-            // var xDelta = mouseUpPos.x - this.mouseDownPos.x;
-            // var yDelta = mouseUpPos.y - this.mouseDownPos.y;
-            // // var zDelta = mouseUpPos.z - this.mouseDownPos.z;
-            
-            // // calc orientation from mouseDownPos and mouseUpPos
-            // var thetaRadians  = Math.atan2(xDelta,yDelta);
-
-            // if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
-            //   thetaRadians += (3 * Math.PI / 2);
-            // } else {
-            //   thetaRadians -= (Math.PI/2);
-            // }
-    
-            // var qz =  Math.sin(-thetaRadians/2.0);
-            // var qw =  Math.cos(-thetaRadians/2.0);
-    
-            // var orientation = new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw});
-    
-            var pose = new ROSLIB.Pose({
-              position :    this.mouseDownPos,
-              orientation : orientation
-            });
-
-            console.log('nav: mouseUP');
-            console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
-            console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
-            console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
-            
-            // send the goal
-            this.sendGoal(pose);
-
-            this.mouseDownPos = null;       // reset
-            event3D.stopPropagation();
-          } 
-          break;
-          
-
-        case 'mousemove':
-          if (this.mouseDown){
-            // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
-            // but we need the mouse UP position
-            var poi = this.calculateCurrentPOI(event3D);
-
-            // get pos on mouse up/out
-            var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-
-            var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
-            this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor);
-          }
-          break;
-
-        // default:
-          // break;               // DO NOT DO event3D.continuePropagation!!!
+  OccupancyGridClient.prototype.processMessage = function processMessage (message){
+    // check for an old map
+    if (this.currentGrid) {
+      // check if it there is a tf client
+      if (this.tfClient) {
+        // grid is of type ROS3D.SceneNode
+        this.sceneNode.unsubscribeTf();
+        this.sceneNode.remove(this.currentGrid);
+      } else {
+        this.rootObject.remove(this.currentGrid);
       }
-    } 
-  };
-
-  Navigator.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
-    // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
-    // but we need the mouse UP position
-    var poi;
-    var mouseRaycaster = new THREE.Raycaster();
-    mouseRaycaster.linePrecision = 0.001;
-    mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
-    
-    // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
-    // so recalculate intersection with that object
-    var newIntersections = [];
-    newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
-
-    if (newIntersections) {
-      poi = newIntersections[0].point;
-    } else {
-      poi = event3D.intersection.point;       // revert to mouse down POI if it fails
+      this.currentGrid.dispose();
     }
-    return poi
+
+    var newGrid = new OccupancyGrid({
+      message : message,
+      color : this.color,
+      opacity : this.opacity
+    });
+
+    // check if we care about the scene
+    if (this.tfClient) {
+      this.currentGrid = newGrid;
+      if (this.sceneNode === null) {
+        this.sceneNode = new SceneNode({
+          frameID : message.header.frame_id,
+          tfClient : this.tfClient,
+          object : newGrid,
+          pose : this.offsetPose
+        });
+        this.rootObject.add(this.sceneNode);
+      } else {
+        this.sceneNode.add(this.currentGrid);
+      }
+    } else {
+      this.sceneNode = this.currentGrid = newGrid;
+      this.rootObject.add(this.currentGrid);
+    }
+
+    this.emit('change');
+
+    // check if we should unsubscribe
+    if (!this.continuous) {
+      this.rosTopic.unsubscribe(this.processMessage);
+    }
   };
 
-
-  Navigator.prototype.activate = function activate (event3D){
-    this.isActive = true;
-  };
-
-  Navigator.prototype.deactivate = function deactivate (event3D){
-    this.isActive = false;
-  };
-
-  Navigator.prototype.toggleActivation = function toggleActivation (event3D){
-    this.isActive = !this.isActive;
-    console.log('Navigator isActive: ' + this.isActive);
-  };
-
-  return Navigator;
-}(THREE.Object3D));
+  return OccupancyGridClient;
+}(EventEmitter2));
 
 /**
  * @fileOverview
@@ -56491,58 +56298,316 @@ var OccupancyGridNav = /*@__PURE__*/(function (OccupancyGrid) {
 }(OccupancyGrid));
 
 /**
- * @fileOverview
- * @author Russell Toris - rctoris@wpi.edu
+ * @author Randel Capati - randelmc21@gmail.com
  */
 
-var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
-  function OccupancyGridClient(options) {
-    EventEmitter2.call(this);
+var Navigator = /*@__PURE__*/(function (superclass) {
+  function Navigator(options) {
+    superclass.call(this);
     options = options || {};
-    this.ros = options.ros;
-    this.topicName = options.topic || '/map';
-    this.compression = options.compression || 'cbor';
-    this.continuous = options.continuous;
-    this.tfClient = options.tfClient;
-    this.rootObject = options.rootObject || new THREE.Object3D();
-    this.offsetPose = options.offsetPose || new ROSLIB.Pose();
-    this.color = options.color || {r:255,g:255,b:255};
-    this.opacity = options.opacity || 1.0;
+    var ros = options.ros;
+    this.rootObject = options.rootObject;
+    this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
+    var serverName = options.serverName || '/move_base';
+    var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
+    this.tfClient = options.tfClient || null;
+    this.color = options.color || 0xcc00ff;
+    this.intermediateColor = options.intermediateColor || 0x8f00b3;
+
+    this.isActive = true;                           // toggle this if you want navigation or not
+
+    this.mouseDownPos = null;                       // roslib.Vector3 pos
+    this.mouseDown = false;                         // if mousedown was previously detected
+    this.currentGoal = null;                        // action goal message
+    this.goalMarkerOptions = {color: this.color};
+    this.goalMarker = null;
+
+    // setup the actionlib client
+    this.actionClient = new ROSLIB.ActionClient({
+      ros : ros,
+      actionName : actionName,
+      serverName : serverName
+    });
+
+    
+    // Since this is called by objects other than itself (addeventlistener on OGNav)
+    this.mouseEventHandler = this.mouseEventHandlerUnbound.bind(this);
+    
+
+  }
+
+  if ( superclass ) Navigator.__proto__ = superclass;
+  Navigator.prototype = Object.create( superclass && superclass.prototype );
+  Navigator.prototype.constructor = Navigator;
+
+  Navigator.prototype.sendGoal = function sendGoal (pose){
+    // create a goal, use the message type move_base_msgs/MoveBaseAction
+    var goalMessage = {
+      target_pose : {
+        header : {
+          frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
+        },
+        pose : pose
+      }
+    };
+    // Only add "priority_val" on roamer messages since move_base_msgs/MoveBaseAction has no priority,
+    // will produce error if the message and message type fields do not match
+    if (this.actionClient.actionName === 'roamer_msgs/MoveBaseAction'){
+      goalMessage.priority_val = 1;   // Since prio=0 can't override previous prio=0 goals
+    }
+    var goal = new ROSLIB.Goal({
+      actionClient : this.actionClient,
+      goalMessage : goalMessage,
+    });
+    goal.send();
+    console.log('nav: pose sent');
+    
+    this.currentGoal = goal;
+
+    // update marker
+    this.updateGoalMarker(pose.position, pose.orientation);
+
+    // remove old marker first
+    // if (this.goalMarker !== null){
+    //   this.remove(this.goalMarker);
+    // }
+
+    // this.goalMarkerOptions.origin  = new THREE.Vector3( pose.position.x, pose.position.y, pose.position.z);
+    // this.goalMarkerOptions.rot = new THREE.Quaternion(pose.orientation.x, pose.orientation.y, 
+    //   pose.orientation.z, pose.orientation.w);
+    // this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
+    // this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
+    // this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: this.color});
+
+    // this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
+    // this.add(this.goalMarker);
+    // // this.rootObject.forceUpdate();
+    // // this.rootObject.sceneNode.add(this.goalMarker);
+    // this.rootObject.emit('change');
+  };
+
+  Navigator.prototype.updateGoalMarker = function updateGoalMarker (pos, orientation, color){
+    // remove old marker first
+    if (this.goalMarker !== null){
+      this.remove(this.goalMarker);
+    }
+    var c = color || this.color;
+
+    this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
+    this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+    this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
+    this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
+    this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
+
+    this.goalMarker = new Arrow(this.goalMarkerOptions);
+    this.add(this.goalMarker);
+
+    this.rootObject.emit('change');
+  };
+
+
+  // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
+  Navigator.prototype.calculateOrientation = function calculateOrientation (p1, p2){
+    var xDelta = p2.x - p1.x;
+    var yDelta = p2.y - p1.y;
+    // var zDelta = p2.z - p1.z;
+    if (xDelta === 0.0 && yDelta === 0.0){
+      console.log('nav ori: same down and up point');
+    }
+    
+    // calc orientation from mouseDownPos and mouseUpPos
+    var thetaRadians  = Math.atan2(xDelta,yDelta);
+
+    if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
+      thetaRadians += (3 * Math.PI / 2);
+    } else {
+      thetaRadians -= (Math.PI/2);
+    }
+
+    var qz =  Math.sin(-thetaRadians/2.0);
+    var qw =  Math.cos(-thetaRadians/2.0);
+
+    return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
+  };
+
+
+  Navigator.prototype.mouseEventHandlerUnbound = function mouseEventHandlerUnbound (event3D){
+    // only handle mouse events when active
+    // 0: Accepted    , so either stop propagation or don't handle it
+    // 1: Failed
+    // 2: Continued
+    // if (this.isActive && (event3D.domEvent.button === 0) && (event3D.domEvent.buttons === 1)){
+    if (this.isActive){
+      // var poi = event3D.intersection.point; 
+
+      // check event3D.type (handled by MouseHandler), !!!NOT!!! event3D.domEvent.type
+      // so that target will not be fallbackTarget (which is OrbitControl)
+      switch(event3D.type){
+        case 'mouseover':
+          // accept a mouseover, as we need it in MouseHandler line 138
+          // but only accept it if it is a left mouse click
+          // we do this so that middle/wheel and right click events are not accepted, and instead caught by camera
+          // if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 && event3D.domEvent.buttons === 1){
+          if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0){
+            event3D.stopPropagation();
+          }
+          break;
+          
+        case 'mousedown':
+          // only handle mousedown for left mouse button (main button)
+          // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
+          // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
+          if ((event3D.domEvent.button === 0) && (event3D.domEvent.buttons === 1)){
+            var poi = event3D.intersection.point; 
+            console.log('nav: mouseDOWN');
+            this.mouseDownPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+            this.mouseDown = true;
+
+            event3D.stopPropagation();
+          } 
+          break;
+
+        // case 'dblclick':
+        //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+        //   var pose = new ROSLIB.Pose({
+        //     position : new ROSLIB.Vector3(coords)
+        //   });
+        //   // send the goal
+        //   this.sendGoal(pose);
+        //   console.log('nav: mouseDBLCLICK');
+
+        case 'mouseout':
+        case 'mouseup':
+          // mouse up for main button only (left button)
+          if (this.mouseDown && (event3D.domEvent.button === 0)  ){
+            // reset
+            this.mouseDown = false;
+
+            // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
+            // but we need the mouse UP position
+            var poi = this.calculateCurrentPOI(event3D);
+
+            // get pos on mouse up/out
+            var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+
+            var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
+
+
+
+            // var xDelta = mouseUpPos.x - this.mouseDownPos.x;
+            // var yDelta = mouseUpPos.y - this.mouseDownPos.y;
+            // // var zDelta = mouseUpPos.z - this.mouseDownPos.z;
+            
+            // // calc orientation from mouseDownPos and mouseUpPos
+            // var thetaRadians  = Math.atan2(xDelta,yDelta);
+
+            // if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
+            //   thetaRadians += (3 * Math.PI / 2);
+            // } else {
+            //   thetaRadians -= (Math.PI/2);
+            // }
+    
+            // var qz =  Math.sin(-thetaRadians/2.0);
+            // var qw =  Math.cos(-thetaRadians/2.0);
+    
+            // var orientation = new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw});
+    
+            var pose = new ROSLIB.Pose({
+              position :    this.mouseDownPos,
+              orientation : orientation
+            });
+
+            console.log('nav: mouseUP');
+            console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
+            console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
+            console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
+            
+            // send the goal
+            this.sendGoal(pose);
+
+            this.mouseDownPos = null;       // reset
+            event3D.stopPropagation();
+          } 
+          break;
+          
+
+        case 'mousemove':
+          if (this.mouseDown){
+            // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
+            // but we need the mouse UP position
+            var poi = this.calculateCurrentPOI(event3D);
+
+            // get pos on mouse up/out
+            var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
+
+            var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
+            this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor);
+          }
+          break;
+
+        // default:
+          // break;               // DO NOT DO event3D.continuePropagation!!!
+      }
+    } 
+  };
+
+  Navigator.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
+    // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
+    // but we need the mouse UP position
+    var poi;
+    var mouseRaycaster = new THREE.Raycaster();
+    mouseRaycaster.linePrecision = 0.001;
+    mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
+    
+    // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
+    // so recalculate intersection with that object
+    var newIntersections = [];
+    newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
+
+    if (newIntersections) {
+      poi = newIntersections[0].point;
+    } else {
+      poi = event3D.intersection.point;       // revert to mouse down POI if it fails
+    }
+    return poi
+  };
+
+
+  Navigator.prototype.activate = function activate (event3D){
+    this.isActive = true;
+  };
+
+  Navigator.prototype.deactivate = function deactivate (event3D){
+    this.isActive = false;
+  };
+
+  Navigator.prototype.toggleActivation = function toggleActivation (event3D){
+    this.isActive = !this.isActive;
+    console.log('Navigator isActive: ' + this.isActive);
+  };
+
+  return Navigator;
+}(THREE.Object3D));
+
+/**
+ * @fileOverview
+ * @author Randel Capati - randelmc21@gmail
+ */
+
+var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
+  function OccupancyGridClientNav(options) {
+    OccupancyGridClient.call(this, options);
     this.viewer = options.viewer || null;
     this.navServerName = options.navServerName || '/move_base';
     this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
-
-    // current grid that is displayed
-    this.currentGrid = null;
-
-    // subscribe to the topic
-    this.rosTopic = undefined;
-    this.subscribe();
   }
 
-  if ( EventEmitter2 ) OccupancyGridClient.__proto__ = EventEmitter2;
-  OccupancyGridClient.prototype = Object.create( EventEmitter2 && EventEmitter2.prototype );
-  OccupancyGridClient.prototype.constructor = OccupancyGridClient;
-  OccupancyGridClient.prototype.unsubscribe = function unsubscribe (){
-    if(this.rosTopic){
-      this.rosTopic.unsubscribe(this.processMessage);
-    }
-  };
-  OccupancyGridClient.prototype.subscribe = function subscribe (){
-    this.unsubscribe();
+  if ( OccupancyGridClient ) OccupancyGridClientNav.__proto__ = OccupancyGridClient;
+  OccupancyGridClientNav.prototype = Object.create( OccupancyGridClient && OccupancyGridClient.prototype );
+  OccupancyGridClientNav.prototype.constructor = OccupancyGridClientNav;
 
-    // subscribe to the topic
-    this.rosTopic = new ROSLIB.Topic({
-      ros : this.ros,
-      name : this.topicName,
-      messageType : 'nav_msgs/OccupancyGrid',
-      queue_length : 1,
-      compression : this.compression
-    });
-    this.sceneNode = null;
-    this.rosTopic.subscribe(this.processMessage.bind(this));
-  };
-  OccupancyGridClient.prototype.processMessage = function processMessage (message){
+  // Override OccupancyGridClient.processMessage
+  OccupancyGridClientNav.prototype.processMessage = function processMessage (message){
     // check for an old map
     if (this.currentGrid) {
       // check if it there is a tf client
@@ -56608,8 +56673,8 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
     }
   };
 
-  return OccupancyGridClient;
-}(EventEmitter2));
+  return OccupancyGridClientNav;
+}(OccupancyGridClient));
 
 /**
  * @fileOverview
@@ -59176,4 +59241,4 @@ Viewer.prototype.resize = function resize (width, height) {
   this.renderer.setSize(width, height);
 };
 
-export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, Navigator, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };
+export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, Navigator, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridClientNav, OccupancyGridNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };
