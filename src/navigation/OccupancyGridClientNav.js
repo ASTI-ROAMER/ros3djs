@@ -34,6 +34,7 @@ ROS3D.OccupancyGridClientNav = function(options) {
   this.viewer = options.viewer || null;
   this.navServerName = options.navServerName || '/move_base';
   this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
+  this.navigatorInitState = options.navigatorInitState || true;
 };
 ROS3D.OccupancyGridClientNav.prototype.__proto__ = ROS3D.OccupancyGridClient.prototype;
 
@@ -60,6 +61,7 @@ ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
     serverName: this.navServerName,
     actionName: this.navActionName,
     occupancyGridFrameID: message.header.frame_id,      // this should be the same frame id as OccupancyGridNav
+    navigatorInitState: this.navigatorInitState,
 
   });
 
