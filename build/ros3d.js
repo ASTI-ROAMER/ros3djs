@@ -56609,7 +56609,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.color = options.color || 0xcc00ff;
 	    this.intermediateColor = options.intermediateColor || 0x8f00b3;
 
-	    this.isActive = true;                           // toggle this if you want navigation or not
+	    this.isActive = options.navigatorInitState || true;                           // toggle this if you want navigation or not
 
 	    this.mouseDownPos = null;                       // roslib.Vector3 pos
 	    this.mouseDown = false;                         // if mousedown was previously detected
@@ -56918,6 +56918,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.viewer = options.viewer || null;
 	    this.navServerName = options.navServerName || '/move_base';
 	    this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
+	    this.navigatorInitState = options.navigatorInitState || true;
 	  };
 
 
@@ -56943,6 +56944,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	      serverName: this.navServerName,
 	      actionName: this.navActionName,
 	      occupancyGridFrameID: message.header.frame_id,      // this should be the same frame id as OccupancyGridNav
+	      navigatorInitState: this.navigatorInitState,
 
 	    });
 

@@ -36,7 +36,7 @@ ROS3D.Navigator = function(options) {
   this.color = options.color || 0xcc00ff;
   this.intermediateColor = options.intermediateColor || 0x8f00b3;
 
-  this.isActive = true;                           // toggle this if you want navigation or not
+  this.isActive = options.navigatorInitState || true;                           // toggle this if you want navigation or not
 
   this.mouseDownPos = null;                       // roslib.Vector3 pos
   this.mouseDown = false;                         // if mousedown was previously detected
