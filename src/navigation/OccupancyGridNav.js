@@ -15,16 +15,21 @@
  */
 ROS3D.OccupancyGridNav = function(options) {
   ROS3D.OccupancyGrid.call(this, options);
+  // var message = options.message;              // the ros OccupancyGrid message that we need to construct the mesh
   this.navigator = options.navigator || null;
   this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
+
 
   var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
       'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
       'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of ROS3D.MouseHandler
   
   if (this.navigator){
+    // Set the navigator's marker frame ID to be same as this Occupancy Grid
+    // this.navigator.markerFrameID = message.header.frame_id;
+
+    // Bind all mouse events to the event handler (Navigator), if it exists.
     for (var i=0; i < eventNames.length; i++){
-      // Bind all mouse events to the event handler (Navigator), if it exists.
       this.addEventListener(eventNames[i], this.navigator.mouseEventHandler);
     };
   }

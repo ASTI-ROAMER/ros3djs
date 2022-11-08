@@ -56276,16 +56276,21 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
 var OccupancyGridNav = /*@__PURE__*/(function (OccupancyGrid) {
   function OccupancyGridNav(options) {
     OccupancyGrid.call(this, options);
+    // var message = options.message;              // the ros OccupancyGrid message that we need to construct the mesh
     this.navigator = options.navigator || null;
     this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from Highlighter
+
 
     var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
         'mousemove', 'mousewheel', 'DOMMouseScroll', 'touchstart', 'touchend', 'touchcancel',
         'touchleave', 'touchmove', 'mouseover' ];     // mouseover needs to be here because of MouseHandler
     
     if (this.navigator){
+      // Set the navigator's marker frame ID to be same as this Occupancy Grid
+      // this.navigator.markerFrameID = message.header.frame_id;
+
+      // Bind all mouse events to the event handler (Navigator), if it exists.
       for (var i=0; i < eventNames.length; i++){
-        // Bind all mouse events to the event handler (Navigator), if it exists.
         this.addEventListener(eventNames[i], this.navigator.mouseEventHandler);
       }    }
   }
@@ -56307,10 +56312,11 @@ var Navigator = /*@__PURE__*/(function (superclass) {
     options = options || {};
     var ros = options.ros;
     this.rootObject = options.rootObject;
-    this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
+    this.navigatorFrameID = options.navigatorFrameID || 'map';    // this SHOULD ALWAYS BE tfclient's FIXED FRAME
+    this.markerFrameID = options.markerFrameID || this.navigatorFrameID;
     var serverName = options.serverName || '/move_base';
     var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
-    this.tfClient = options.tfClient || null;
+    this.tfClient = options.tfClient;
     this.color = options.color || 0xcc00ff;
     this.intermediateColor = options.intermediateColor || 0x8f00b3;
 
@@ -56345,7 +56351,7 @@ var Navigator = /*@__PURE__*/(function (superclass) {
     var goalMessage = {
       target_pose : {
         header : {
-          frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
+          frame_id : this.navigatorFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
         },
         pose : pose
       }
@@ -56601,11 +56607,44 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
     this.navServerName = options.navServerName || '/move_base';
     this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
     this.navigatorInitState = options.navigatorInitState || false;
+    
+    // set up navigator and its encapsulating sceneNode
+    this.navSceneNode = null;       // just place holders, so that we know these vars exists
+    this.navigator = null;  
+    this.setupNavigator();          // properly setup the navigator
+    
   }
 
   if ( OccupancyGridClient ) OccupancyGridClientNav.__proto__ = OccupancyGridClient;
   OccupancyGridClientNav.prototype = Object.create( OccupancyGridClient && OccupancyGridClient.prototype );
   OccupancyGridClientNav.prototype.constructor = OccupancyGridClientNav;
+  OccupancyGridClientNav.prototype.setupNavigator = function setupNavigator (){
+    if (this.tfClient){     // tfclient is required for the navigator
+      // Instantiate the navigator.
+      this.navigator = new Navigator({
+        ros: this.ros,
+        tfClient: this.tfClient,
+        rootObject: this,
+        serverName: this.navServerName,
+        actionName: this.navActionName,
+        navigatorFrameID: this.tfClient.fixedFrame,      // this should be the same frame as the FIXED FRAME (from tfClient), instead of occupancyGrid frame!!!
+        isActive: this.navigatorInitState,
+      });
+
+      // The Navigator goal message SHOULD be in the fixed frame BUT its marker (the arrow) SHOULD BE RENDERED IN THE MAP (OccupancyGridNav)!!!
+      // Create a ROS3D.SceneNode in which the Navigator is encapsulated in.
+      this.navSceneNode = new SceneNode({
+        frameID : this.tfClient.fixedFrame,
+        tfClient : this.tfClient,
+        object : this.navigator,
+        pose : this.offsetPose
+      });
+
+      // Add the navSceneNode to the viewer's scene (THREE.Scene)
+      this.rootObject.add(this.navSceneNode);
+    }
+  };
+
 
   // Override OccupancyGridClient.processMessage
   OccupancyGridClientNav.prototype.processMessage = function processMessage (message){
@@ -56621,17 +56660,6 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
       }
       this.currentGrid.dispose();
     }
-
-    this.navigator = new Navigator({
-      ros: this.ros,
-      tfClient: this.tfClient,
-      rootObject: this,
-      serverName: this.navServerName,
-      actionName: this.navActionName,
-      occupancyGridFrameID: message.header.frame_id,      // this should be the same frame id as OccupancyGridNav
-      isActive: this.navigatorInitState,
-
-    });
 
     var newGrid = new OccupancyGridNav({
       message : message,
@@ -56650,16 +56678,16 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
           object : newGrid,
           pose : this.offsetPose
         });
-        this.sceneNode.add(this.navigator);
+        // this.sceneNode.add(this.navigator);
         this.rootObject.add(this.sceneNode);
       } else {
         this.sceneNode.add(this.currentGrid);
-        this.sceneNode.add(this.navigator);
+        // this.sceneNode.add(this.navigator);
       }
     } else {
       this.sceneNode = this.currentGrid = newGrid;
       this.rootObject.add(this.currentGrid);
-      this.rootObject.add(this.navigator);
+      // this.rootObject.add(this.navigator);
     }
 
     if (this.viewer){

@@ -13,10 +13,10 @@
  * @param options - object with following keys:
  *   * ros - the ROSLIB.Ros connection handle
  *   * rootObject - the root object to add the click listeners to and render robot markers to (OccupancyGridClientNav)
- *   * occupancyGridFrameID - tf frame ID of current map, defaults to 'map'
+ *   * navigatorFrameID - tf frame ID on which the goal will be sent
  *   * serverName (optional) - the action server name to use for navigation, like '/move_base'
  *   * actionName (optional) - the navigation action name, like 'move_base_msgs/MoveBaseAction'
- *   * tfClient (optional) - the TF client   (not used for now)
+ *   * tfClient- the TF client   (not used for now)
  *   * color (optional) - color of the marker of the **sent** pose
  *   * intermediateColor (optional) - color of the marker while dragging it around / choosing which orientation to go
  * 
@@ -29,10 +29,11 @@ ROS3D.Navigator = function(options) {
   options = options || {};
   var ros = options.ros;
   this.rootObject = options.rootObject;
-  this.occupancyGridFrameID = options.occupancyGridFrameID || 'map';
+  this.navigatorFrameID = options.navigatorFrameID || 'map';    // this SHOULD ALWAYS BE tfclient's FIXED FRAME
+  this.markerFrameID = options.markerFrameID || this.navigatorFrameID;
   var serverName = options.serverName || '/move_base';
   var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
-  this.tfClient = options.tfClient || null;
+  this.tfClient = options.tfClient;
   this.color = options.color || 0xcc00ff;
   this.intermediateColor = options.intermediateColor || 0x8f00b3;
 
@@ -65,7 +66,7 @@ ROS3D.Navigator.prototype.sendGoal = function(pose){
   var goalMessage = {
     target_pose : {
       header : {
-        frame_id : this.occupancyGridFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
+        frame_id : this.navigatorFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
       },
       pose : pose
     }

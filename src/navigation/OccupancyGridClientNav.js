@@ -35,8 +35,41 @@ ROS3D.OccupancyGridClientNav = function(options) {
   this.navServerName = options.navServerName || '/move_base';
   this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
   this.navigatorInitState = options.navigatorInitState || false;
+  
+  // set up navigator and its encapsulating sceneNode
+  this.navSceneNode = null;       // just place holders, so that we know these vars exists
+  this.navigator = null;  
+  this.setupNavigator();          // properly setup the navigator
+  
 };
 ROS3D.OccupancyGridClientNav.prototype.__proto__ = ROS3D.OccupancyGridClient.prototype;
+
+ROS3D.OccupancyGridClientNav.prototype.setupNavigator = function(){
+  if (this.tfClient){     // tfclient is required for the navigator
+    // Instantiate the navigator.
+    this.navigator = new ROS3D.Navigator({
+      ros: this.ros,
+      tfClient: this.tfClient,
+      rootObject: this,
+      serverName: this.navServerName,
+      actionName: this.navActionName,
+      navigatorFrameID: this.tfClient.fixedFrame,      // this should be the same frame as the FIXED FRAME (from tfClient), instead of occupancyGrid frame!!!
+      isActive: this.navigatorInitState,
+    });
+
+    // The Navigator goal message SHOULD be in the fixed frame BUT its marker (the arrow) SHOULD BE RENDERED IN THE MAP (OccupancyGridNav)!!!
+    // Create a ROS3D.SceneNode in which the Navigator is encapsulated in.
+    this.navSceneNode = new ROS3D.SceneNode({
+      frameID : this.tfClient.fixedFrame,
+      tfClient : this.tfClient,
+      object : this.navigator,
+      pose : this.offsetPose
+    });
+
+    // Add the navSceneNode to the viewer's scene (THREE.Scene)
+    this.rootObject.add(this.navSceneNode);
+  }
+}
 
 
 // Override OccupancyGridClient.processMessage
@@ -53,17 +86,6 @@ ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
     }
     this.currentGrid.dispose();
   }
-
-  this.navigator = new ROS3D.Navigator({
-    ros: this.ros,
-    tfClient: this.tfClient,
-    rootObject: this,
-    serverName: this.navServerName,
-    actionName: this.navActionName,
-    occupancyGridFrameID: message.header.frame_id,      // this should be the same frame id as OccupancyGridNav
-    isActive: this.navigatorInitState,
-
-  });
 
   var newGrid = new ROS3D.OccupancyGridNav({
     message : message,
@@ -82,16 +104,16 @@ ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
         object : newGrid,
         pose : this.offsetPose
       });
-      this.sceneNode.add(this.navigator);
+      // this.sceneNode.add(this.navigator);
       this.rootObject.add(this.sceneNode);
     } else {
       this.sceneNode.add(this.currentGrid);
-      this.sceneNode.add(this.navigator);
+      // this.sceneNode.add(this.navigator);
     }
   } else {
     this.sceneNode = this.currentGrid = newGrid;
     this.rootObject.add(this.currentGrid);
-    this.rootObject.add(this.navigator);
+    // this.rootObject.add(this.navigator);
   }
 
   if (this.viewer){
