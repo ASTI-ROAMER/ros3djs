@@ -27,18 +27,30 @@
   THREE.Object3D.call(this);
   var that = this;
   options = options || {};
+
   var ros = options.ros;
+  this.tfClient = options.tfClient;
   this.rootObject = options.rootObject;
   this.navigatorFrameID = options.navigatorFrameID || 'map';    // this SHOULD ALWAYS BE tfclient's FIXED FRAME
-  this.markerFrameID = options.markerFrameID || this.navigatorFrameID;
-  var serverName = options.serverName || '/move_base';
-  var actionName = options.actionName || 'move_base_msgs/MoveBaseAction';
-  this.tfClient = options.tfClient;
-  this.color = options.color || 0xcc00ff;
-  this.intermediateColor = options.intermediateColor || 0x8f00b3;
+  
+  // the default options to be used by Navigator, update this with navOptions that is passed by the caller
+  // we do this so we don't have to guard all the vars (e.g. var serverName = options.serverName || '/move_base';)
+  var defaultNavOptions = { navServerName:      '/move_base',
+                            navActionName:      'move_base_msgs/MoveBaseAction',
+                            navInitState:       false,
+                            color:              0xcc00ff,
+                            intermediateColor:  0x8f00b3,};
+  // Update/merge the defaultNavOptions with the given navOptions
+  var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
 
-  this.isActive = options.navigatorInitState || false;                           // toggle this if you want navigation or not
+  var serverName = navOptions.navServerName;   // we don't need to store serverName since it is encoded in this.actionClient
+  var actionName = navOptions.navActionName;
+  this.color = navOptions.color;
+  this.intermediateColor = navOptions.intermediateColor;
+  this.markerFrameID = navOptions.markerFrameID || this.navigatorFrameID;
+  this.isActive = navOptions.navInitState;        // toggle this if you want navigation or not
 
+  // initialize mouse and marker vars
   this.mouseDownPos = null;                       // roslib.Vector3 pos
   this.mouseDown = false;                         // if mousedown was previously detected
   this.currentGoal = null;                        // action goal message
@@ -87,7 +99,7 @@ ROS3D.Navigator.prototype.sendGoal = function(pose){
   this.currentGoal = goal;
 
   // update marker
-  this.updateGoalMarker(pose.position, pose.orientation)
+  this.updateGoalMarker(pose.position, pose.orientation);
 
   
 };

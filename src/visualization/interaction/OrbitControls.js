@@ -90,7 +90,7 @@ ROS3D.OrbitControls = function(options) {
    * @param event3D - the 3D event to handle
    */
   function onMouseDown(event3D) {
-    console.log('orbit: mouseDOWN');
+    // console.log('orbit: mouseDOWN');
     var event = event3D.domEvent;
     event.preventDefault();
 

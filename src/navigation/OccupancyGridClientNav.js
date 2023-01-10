@@ -32,9 +32,9 @@
 ROS3D.OccupancyGridClientNav = function(options) {
   ROS3D.OccupancyGridClient.call(this, options);
   this.viewer = options.viewer || null;
-  this.navServerName = options.navServerName || '/move_base';
-  this.navActionName = options.navActionName || 'move_base_msgs/MoveBaseAction';
-  this.navigatorInitState = options.navigatorInitState || false;
+  this.navType = options.navType || 'normal';
+  
+  this.navOptions = options.navOptions || {};
   
   // set up navigator and its encapsulating sceneNode
   this.navSceneNode = null;       // just place holders, so that we know these vars exists
@@ -46,16 +46,26 @@ ROS3D.OccupancyGridClientNav.prototype.__proto__ = ROS3D.OccupancyGridClient.pro
 
 ROS3D.OccupancyGridClientNav.prototype.setupNavigator = function(){
   if (this.tfClient){     // tfclient is required for the navigator
-    // Instantiate the navigator.
-    this.navigator = new ROS3D.Navigator({
-      ros: this.ros,
-      tfClient: this.tfClient,
-      rootObject: this,
-      serverName: this.navServerName,
-      actionName: this.navActionName,
-      navigatorFrameID: this.tfClient.fixedFrame,      // this should be the same frame as the FIXED FRAME (from tfClient), instead of occupancyGrid frame!!!
-      isActive: this.navigatorInitState,
-    });
+    // Check what type of navigator
+
+    var navArgs = { ros: this.ros,
+                    tfClient: this.tfClient,
+                    rootObject: this,
+                    navigatorFrameID: this.tfClient.fixedFrame,      // this should be the same frame as the FIXED FRAME (from tfClient), instead of occupancyGrid frame!!!
+                    navOptions: this.navOptions,};
+    switch(this.navType){
+      case 'waypoints':
+      case 'waypoint':
+      case 'wp':
+        this.navigator = new ROS3D.Navigator_MW(navArgs);
+        break;
+      case 'navigator':
+      case 'normal':
+      default:
+        this.navigator = new ROS3D.Navigator(navArgs);
+    }
+
+
 
     // The Navigator goal message SHOULD be in the fixed frame BUT its marker (the arrow) SHOULD BE RENDERED IN THE MAP (OccupancyGridNav)!!!
     // Create a ROS3D.SceneNode in which the Navigator is encapsulated in.
