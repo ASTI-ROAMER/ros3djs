@@ -23,7 +23,7 @@
  *   * isActive - the internal state whether Navigator works or not on clicks, 
  */
 
-ROS3D.Navigator = function(options) {
+ ROS3D.Navigator = function(options) {
   THREE.Object3D.call(this);
   var that = this;
   options = options || {};
@@ -89,23 +89,7 @@ ROS3D.Navigator.prototype.sendGoal = function(pose){
   // update marker
   this.updateGoalMarker(pose.position, pose.orientation)
 
-  // remove old marker first
-  // if (this.goalMarker !== null){
-  //   this.remove(this.goalMarker);
-  // }
-
-  // this.goalMarkerOptions.origin  = new THREE.Vector3( pose.position.x, pose.position.y, pose.position.z);
-  // this.goalMarkerOptions.rot = new THREE.Quaternion(pose.orientation.x, pose.orientation.y, 
-  //   pose.orientation.z, pose.orientation.w);
-  // this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
-  // this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
-  // this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: this.color});
-
-  // this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
-  // this.add(this.goalMarker);
-  // // this.rootObject.forceUpdate();
-  // // this.rootObject.sceneNode.add(this.goalMarker);
-  // this.rootObject.emit('change');
+  
 };
 
 
@@ -308,4 +292,3 @@ ROS3D.Navigator.prototype.toggleActivation = function(event3D){
   this.isActive = !this.isActive;
   console.log('Navigator isActive: ' + this.isActive);
 }
-
