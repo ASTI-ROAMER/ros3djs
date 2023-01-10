@@ -56858,6 +56858,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     Navigator_MW.prototype.updateGoalList = function updateGoalList (pose){
       var goal = pose;
       this.goalList.push(goal);
+      this.rootObject.emit('navigationUpd');
       console.log('GOAL SEQUENCE ',this.goalList);
 
     };

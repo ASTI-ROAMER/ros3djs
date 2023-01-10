@@ -161,6 +161,7 @@
   ROS3D.Navigator_MW.prototype.updateGoalList = function(pose){
     var goal = pose;
     this.goalList.push(goal);
+    this.rootObject.emit('navigationUpd');
     console.log('GOAL SEQUENCE ',this.goalList);
 
   }

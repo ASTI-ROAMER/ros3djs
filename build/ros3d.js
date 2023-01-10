@@ -57166,6 +57166,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    updateGoalList(pose){
 	      var goal = pose;
 	      this.goalList.push(goal);
+	      this.rootObject.emit('navigationUpd');
 	      console.log('GOAL SEQUENCE ',this.goalList);
 
 	    }
