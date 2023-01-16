@@ -9,11 +9,11 @@
   "dependencies": {
     "eventemitter2": "^6.4.0",
     "roslib": "^1.0.0",
-    "three": "^0.89.0"
+    "three": "^0.124.0"
   },
   "devDependencies": {
     "@rollup/plugin-buble": "^1.0.0",
-    "@rollup/plugin-commonjs": "^23.0.0",
+    "@rollup/plugin-commonjs": "^24.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "chai": "^4.3.0",
     "debug": "^4.3.0",

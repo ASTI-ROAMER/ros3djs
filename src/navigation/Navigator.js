@@ -4,6 +4,7 @@
 
 /**
  * A navigator can be used to add click-to-navigate options to an object. 
+ * The navigator IS ALSO A RENDERABLE OBJECT3D.
  * Sort of ported from ros2d (nav2d) to ros3d.
  * This always uses pose with orientation.
  * Works by clicking at the goal position (on the OccupancyGridNav) and pointing into the desired
@@ -105,12 +106,13 @@ ROS3D.Navigator.prototype.sendGoal = function(pose){
 };
 
 
-ROS3D.Navigator.prototype.updateGoalMarker = function(pos, orientation, color){
+
+
+ROS3D.Navigator.prototype.updateGoalMarker = function(pos, orientation, c=this.color){
   // remove old marker first
   if (this.goalMarker !== null){
     this.remove(this.goalMarker);
   }
-  var c = color || this.color;
 
   this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
   this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
@@ -131,7 +133,10 @@ ROS3D.Navigator.prototype.calculateOrientation = function(p1, p2){
   var yDelta = p2.y - p1.y;
   // var zDelta = p2.z - p1.z;
   if (xDelta === 0.0 && yDelta === 0.0){
+    return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
     console.log('nav ori: same down and up point');
+
+    // TODO: If the mouse has NOT BEEN DRAGGED, get the orientation between the current robot pose and clicked position
   }
   
   // calc orientation from mouseDownPos and mouseUpPos
@@ -181,6 +186,7 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
           console.log('nav: mouseDOWN');
           this.mouseDownPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
           this.mouseDown = true;
+          // this.updateGoalMarker(this.mouseDownPos, this.defaultOri, this.intermediateColor)
 
           event3D.stopPropagation();
         } 
@@ -275,7 +281,7 @@ ROS3D.Navigator.prototype.calculateCurrentPOI = function(event3D){
   // but we need the mouse UP position
   var poi;
   var mouseRaycaster = new THREE.Raycaster();
-  mouseRaycaster.linePrecision = 0.001;
+  mouseRaycaster.params.Line.threshold = 0.001;
   mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
   
   // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down

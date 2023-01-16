@@ -40,7 +40,8 @@ ROS3D.Navigator_MW = function(options) {
                             navActionName:      'move_base_msgs/MoveBaseAction',
                             navInitState:       false,
                             color:              0xcc00ff,
-                            intermediateColor:  0x8f00b3,};
+                            intermediateColor:  0x8f00b3,
+                            defaultDirection:   new THREE.Vector3(1,0,0),};
   // Update/merge the defaultNavOptions with the given navOptions
   var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
 
@@ -57,9 +58,12 @@ ROS3D.Navigator_MW = function(options) {
   this.mouseDown = false;                         // if mousedown was previously detected
   this.currentGoal = null;                        // action goal message
   this.goalMarkerOptions = {color: this.color};
-  this.goalMarker = null;
+
+  this.latestMarker = null;
+  // this.goalMarker = new THREE.Object3D();
   //MITZ
   this.goalList = new Array();                         //stores goal points
+
   
   // setup the actionlib client
   this.actionClient = new ROSLIB.ActionClient({
@@ -67,132 +71,80 @@ ROS3D.Navigator_MW = function(options) {
     actionName : actionName,
     serverName : serverName
   });
-  
     
   // Since this is called by objects other than itself (addeventlistener on OGNav)
   this.mouseEventHandler = this.mouseEventHandlerUnbound.bind(this);
     
   
-  };
-  
-  ROS3D.Navigator_MW.prototype.__proto__ = THREE.Object3D.prototype;
-  
-  // ROS3D.Navigator.prototype.sendGoal = function(pose){
-  //   // create a goal, use the message type move_base_msgs/MoveBaseAction
-  //   var goalMessage = {
-  //     target_pose : {
-  //       header : {
-  //         frame_id : this.navigatorFrameID,   // get the frame id of the Occupancy Grid, and use that frame when publishing the goal
-  //       },
-  //       pose : pose
-  //     }
-  //   };
-  //   // Only add "priority_val" on roamer messages since move_base_msgs/MoveBaseAction has no priority,
-  //   // will produce error if the message and message type fields do not match
-  //   if (this.actionClient.actionName === 'roamer_msgs/MoveBaseAction'){
-  //     goalMessage.priority_val = 1;   // Since prio=0 can't override previous prio=0 goals
-  //   };
-  
-  //   var goal = new ROSLIB.Goal({
-  //     actionClient : this.actionClient,
-  //     goalMessage : goalMessage,
-  //   });
-  //   //goal.send();
-  //   console.log('nav: pose sent');
-    
-  //   this.currentGoal = goal;
-  
-  //   // update marker
-  //   //this.updateGoalMarker(pose.position, pose.orientation)
-  
-  //   // remove old marker first
-  //   // if (this.goalMarker !== null){
-  //   //   this.remove(this.goalMarker);
-  //   // }
-  
-  //   // this.goalMarkerOptions.origin  = new THREE.Vector3( pose.position.x, pose.position.y, pose.position.z);
-  //   // this.goalMarkerOptions.rot = new THREE.Quaternion(pose.orientation.x, pose.orientation.y, 
-  //   //   pose.orientation.z, pose.orientation.w);
-  //   // this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
-  //   // this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
-  //   // this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: this.color});
-  
-  //   // this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
-  //   // this.add(this.goalMarker);
-  //   // // this.rootObject.forceUpdate();
-  //   // // this.rootObject.sceneNode.add(this.goalMarker);
-  //   // this.rootObject.emit('change');
-  // };
-  
-  //Mitz - store goals in an array
-  
-// ROS3D.Navigator_MW.prototype.updateAllMarkers = function(){
+};
 
-// }
-  
-ROS3D.Navigator_MW.prototype.updateGoalMarker = function(pos, orientation, color){
-  // remove old marker first
-  if (this.goalMarker !== null){
-    this.remove(this.goalMarker);
-  }
-  var c = color || this.color;
+ROS3D.Navigator_MW.prototype.__proto__ = THREE.Object3D.prototype;
 
+
+ROS3D.Navigator_MW.prototype.addPoseMarker = function(pos, ori={x:0.0, y:0.0, z:0.0, w:1.0}, c=this.color){
   this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
-  this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+  this.goalMarkerOptions.rot = new THREE.Quaternion(ori.x, ori.y, ori.z, ori.w);
   this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
   this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
   this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
-  this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
-  this.add(this.goalMarker);
-
-  this.rootObject.emit('change');
+  var tempMarker = new ROS3D.Sphere(this.goalMarkerOptions);
+  this.add(tempMarker);
+  this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
 }
+
+// Applies an orientation (quaternion) as a direction to the latest marker or the given marker
+ROS3D.Navigator_MW.prototype.updateMarkerOri = function(ori, marker=this.latestMarker, c=this.color){
+  if (marker !== null){
+    var rot = new THREE.Quaternion(ori.x, ori.y, ori.z, ori.w);
+    var direction = new THREE.Vector3(1,0,0);
+    direction.applyQuaternion(rot);
+    marker.setDirection(direction);
+    marker.setColor(c);
+    this.rootObject.emit('change');
+  }
+}
+
+// TODO: USE THIS TO ADD POINT CONNECTORS LATER
+// ROS3D.Navigator_MW.prototype.addConnectingMarker = function(newPos=this.mouseDownPos){
+//   if(this.goalList.length > 0){
+//     var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
+//     var ori = this.calculateOrientation(oldPos, newPos);
+//     var length = 
+
+//     // Create a line with arrowhead connecting the 2 position
+
+// }
+  
+ROS3D.Navigator_MW.prototype.clearAllMarkers = function(){
+  // redundant function, just for clarity
+  this.clear();   // remember, Navigator is a THREE.Object3D, clearing its children will remove any markers
+}
+
+
+// RANDEL: Re-constructs all markers of all the waypoints.
+ROS3D.Navigator_MW.prototype.updateAllMarkers = function(){
+  this.clear();
+  
+  for (let i=0; i < this.goalList.length;  i++){
+    var pose = this.goalList[i];
+    this.addPoseMarker(pose.position, pose.orientation);
+  }
+  // this.rootObject.emit('change');
+}
+  
 
 //Mitz - update array
-
-ROS3D.Navigator_MW.prototype.storeGoalPose = function (pose){
-  var goal = new ROSLIB.Goal({
-    actionClient : this.actionClient,
-    //     goalMessage : goalMessage,
-    listGoal: {
-      target_pose: {
-        header: {
-          frame_id: 'map',
-        },
-        pose: pose,
-      },
-    },
-  });
-  this.currentGoal = goal;
-  this.updateGoalList(pose);
-  // this.displayPose(pose);
-  //console.log('curent goal',goal)
-  //this.updateGoalMarker(pose.position, pose.orientation)
-
-}
-
 ROS3D.Navigator_MW.prototype.updateGoalList = function(pose){
-  var goal = pose;
-  this.goalList.push(goal);
+  this.goalList.push(pose);
   this.rootObject.emit('navigationUpd');
-  // console.log('GOAL SEQUENCE ',this.goalList);
+  console.log('index: ', this.goalList.length - 1);
+  console.log('x: ',pose.position.x);
+  console.log('y: ',pose.position.y);
+  console.log('z: ',pose.position.z);
 
 }
-//convert poi.x and poi.y into string for visualization
-// ROS3D.Navigator_MW.prototype.displayPose = function(pose){
-//   this.targetGoal = !this.targetGoal
-//   //console.log('TARGET GOAL', this.targetGoal);
-// }
-// ROS3D.Navigator_MW.prototype.noPose = function(pose){
-//   this.targetGoal = 0
-//   console.log('No target')
-// }
 
-// ROS3D.Navigator_MW.prototype.wPose = function(pose){
-//   this.targetGoal = pose
-//   console.log('Pose ghfghfh', pose)
-// }
 
 // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
 ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
@@ -200,6 +152,7 @@ ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
   var yDelta = p2.y - p1.y;
   // var zDelta = p2.z - p1.z;
   if (xDelta === 0.0 && yDelta === 0.0){
+    return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
     console.log('nav ori: same down and up point');
   }
   
@@ -221,6 +174,7 @@ ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
 
 ROS3D.Navigator_MW.prototype.clearGoalList = function(){
   this.goalList = new Array();
+  this.clear();         // clears markers
 }
 
 
@@ -257,6 +211,7 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           this.mouseDown = true;
           
           var goal = this.mouseDownPos
+          this.addPoseMarker(this.mouseDownPos, undefined, this.intermediateColor);        // ADD MARKER ON MOUSEDOWN, then update its orientation upon mouseup
           //store pose goal to a var to display
           
           event3D.stopPropagation();
@@ -290,9 +245,11 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           // send the goal
           //this.sendGoal(pose);
           // this.displayPose(pose.position) // will convert location  to string
-          this.storeGoalPose(pose.position); //transfer pose.position to storegoal for action client
-          //this.updateGoalList(pose.position)
+          // this.storeGoalPose(pose.position); //transfer pose.position to storegoal for action client
+          this.updateGoalList(pose);
+          this.updateMarkerOri(orientation);  
           // console.log(pose.position);
+          // this.updateAllMarkers();
 
           this.mouseDownPos = null;       // reset
           event3D.stopPropagation();
@@ -310,7 +267,9 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
 
           var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
-          this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor)
+          this.updateMarkerOri(orientation, this.latestMarker, this.intermediateColor);  
+          // this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor)
+          // this.updateAllMarkers();
         }
         break;
 
@@ -325,7 +284,7 @@ ROS3D.Navigator_MW.prototype.calculateCurrentPOI = function(event3D){
   // but we need the mouse UP position
   var poi;
   var mouseRaycaster = new THREE.Raycaster();
-  mouseRaycaster.linePrecision = 0.001;
+  mouseRaycaster.params.Line.threshold = 0.001;
   mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
   
   // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
@@ -351,13 +310,15 @@ ROS3D.Navigator_MW.prototype.activate = function(event3D){
 
 ROS3D.Navigator_MW.prototype.deactivate = function(event3D){
   this.isActive = false;
-  this.clearGoalList();
+  // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
 }
 
 ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
   this.isActive = !this.isActive;
+
+  // REMOVE THISSSSS, FOR DEBUGGING ONLY
   if (!this.isActive){
-    this.clearGoalList();
+    // this.clearGoalList();
   }
 }
 
