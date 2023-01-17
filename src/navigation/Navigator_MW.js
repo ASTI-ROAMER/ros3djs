@@ -106,30 +106,31 @@ ROS3D.Navigator_MW.prototype.updateMarkerOri = function(ori, marker=this.latestM
 }
 
 // TODO: USE THIS TO ADD POINT CONNECTORS LATER
-// ROS3D.Navigator_MW.prototype.addConnectingMarker = function(newPos=this.mouseDownPos){
-//   if(this.goalList.length > 0){
-//     var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-//     var ori = this.calculateOrientation(oldPos, newPos);    // get orientation from old to new pos
-//     var length = ROS3D.calcDistance(oldPos, newPos);
+ROS3D.Navigator_MW.prototype.addConnectorMarker = function(newPos=this.mouseDownPos, c=this.color){
+  if(this.goalList.length > 0){
+    var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
 
-//     // Create a line with arrowhead connecting the 2 position
-//     this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
-//     this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
-//     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
-//     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
-//     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
+    var connOptions = {};
+    connOptions.p1 = new THREE.Vector3(oldPos.x, oldPos.y, oldPos.z);
+    connOptions.p2 = new THREE.Vector3(newPos.x, newPos.y, newPos.z);
+    connOptions.material = new THREE.MeshBasicMaterial({color: c});
 
-//     this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
-//   }
-// }
-
-ROS3D.Navigator_MW.prototype.calcDistance = function(p1, p2){
-  var dx = p2.x - p1.x;
-  var dy = p2.y - p1.y;
-  var dz = p2.z - p1.z;
-  return Math.sqrt(dx*dx + dy*dy + dz*dz);
-
+    var connMarker = new ROS3D.NodePoseConnector(connOptions);
+    
+    // if p1 and p2 are too close, NodePoseConnector will have no geometry, so only add it to navigator iff there is geometry
+    if(connMarker.geometry){
+      this.add(connMarker);
+    }
+  }
 }
+
+// ROS3D.Navigator_MW.prototype.calcDistance = function(p1, p2){
+//   var dx = p2.x - p1.x;
+//   var dy = p2.y - p1.y;
+//   var dz = p2.z - p1.z;
+//   return Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+// }
   
 ROS3D.Navigator_MW.prototype.clearAllMarkers = function(){
   // redundant function, just for clarity
@@ -261,8 +262,10 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           //this.sendGoal(pose);
           // this.displayPose(pose.position) // will convert location  to string
           // this.storeGoalPose(pose.position); //transfer pose.position to storegoal for action client
+          this.addConnectorMarker(this.mouseDownPos);
           this.updateGoalList(pose);
           this.updateMarkerOri(orientation);  
+          
           // console.log(pose.position);
           // this.updateAllMarkers();
 
@@ -325,7 +328,7 @@ ROS3D.Navigator_MW.prototype.activate = function(event3D){
 
 ROS3D.Navigator_MW.prototype.deactivate = function(event3D){
   this.isActive = false;
-  // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
+  this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
 }
 
 ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
@@ -333,7 +336,7 @@ ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
 
   // REMOVE THISSSSS, FOR DEBUGGING ONLY
   if (!this.isActive){
-    // this.clearGoalList();
+    this.clearGoalList();
   }
 }
 
