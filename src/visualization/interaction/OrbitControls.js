@@ -229,9 +229,9 @@ ROS3D.OrbitControls = function(options) {
       delta = -event.detail;
     }
     if (delta > 0) {
-      that.zoomIn();
-    } else {
       that.zoomOut();
+    } else {
+      that.zoomIn();
     }
 
     this.showAxes();

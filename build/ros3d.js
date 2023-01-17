@@ -66116,9 +66116,9 @@ var ROS3D = (function (exports, ROSLIB) {
 	        delta = -event.detail;
 	      }
 	      if (delta > 0) {
-	        that.zoomIn();
-	      } else {
 	        that.zoomOut();
+	      } else {
+	        that.zoomIn();
 	      }
 
 	      this.showAxes();
