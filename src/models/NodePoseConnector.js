@@ -5,16 +5,22 @@
 
 /**
  * A NodePoseConnector is a THREE object that can be used to display a straight link between two posistions (xyz).
+ * It consists of an arrow head in the middle of p1 and p2, and shafts coming out of p1 and p2 as illustrated below:
+ * p1 ------>------ p2
+ * 
+ * If distance between p1 and p2 is too short, this will not generate a geometry, thus is NOT RENDERABLE.
+ * If combined shaft lengths is less than the arrowhead length, only arrow head will be shown.
  *
  * @constructor
  * @param options - object with following keys:
- *
- *   * origin (optional) - the origin of the arrow
- *   * direction (optional) - the direction vector of the arrow
- *   * length (optional) - the length of the arrow
+ *    
+ *   * p1 - the given point1
+ *   * p2 - the given point2
  *   * headLength (optional) - the head length of the arrow
- *   * shaftDiameter (optional) - the shaft diameter of the arrow
- *   * headDiameter (optional) - the head diameter of the arrow
+ *   * headRadius (optional) - the head radius of the arrow
+ *   * shaftRadius (optional) - the shaft radius of the shaft
+ *   * offsetLength (optional) - distance from the given point on which the geometry will start, 
+ *                                set to 0 if you want the shaft to start on exactly p1/p2
  *   * material (optional) - the material to use for this arrow
  */
 ROS3D.NodePoseConnector = function(options) {

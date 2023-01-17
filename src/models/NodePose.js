@@ -9,9 +9,12 @@
  * @constructor
  * @param options - object with following keys:
  *
- *   * origin (optional) - the origin of the Node
+ *   * origin (optional) - the origin of the NodePose
  *   * direction (optional) - the direction vector of the Node
- *   * radius (optional) - the radius of the Node
+ *   * radius (optional) - the radius of the NodePose
+ *   * arrowHeadHeight (optional) - length of the arrow WRT the center of the center of sphere
+ *                                - SHOULD be higher than radius!
+ *   * withArrowHead (optional) - defaults to true, if set to false it will only be a sphere
  *   * material (optional) - the material to use for this Node
  */
 ROS3D.NodePose = function(options) {
