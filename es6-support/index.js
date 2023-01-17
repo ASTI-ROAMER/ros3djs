@@ -13,7 +13,7 @@ export * from './markers/Marker'
 export * from './markers/MarkerArrayClient'
 export * from './markers/MarkerClient'
 
-export * from './models/Sphere'
+export * from './models/NodePose'
 export * from './models/Arrow'
 export * from './models/Arrow2'
 export * from './models/Axes'

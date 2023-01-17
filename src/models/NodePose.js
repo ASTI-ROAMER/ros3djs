@@ -4,17 +4,17 @@
  */
 
 /**
- * A Sphere is a THREE object that can be used to display a sphere (for position marking).
+ * A NodePose is a THREE object that can be used to display a Node (plain sphere OR sphere+cone) (for position marking).
  *
  * @constructor
  * @param options - object with following keys:
  *
- *   * origin (optional) - the origin of the sphere
- *   * direction (optional) - the direction vector of the sphere
- *   * radius (optional) - the radius of the sphere
- *   * material (optional) - the material to use for this sphere
+ *   * origin (optional) - the origin of the Node
+ *   * direction (optional) - the direction vector of the Node
+ *   * radius (optional) - the radius of the Node
+ *   * material (optional) - the material to use for this Node
  */
-ROS3D.Sphere = function(options) {
+ROS3D.NodePose = function(options) {
   options = options || {};
   var origin = options.origin || new THREE.Vector3(0, 0, 0);
   var direction = options.direction || new THREE.Vector3(1, 0, 0);
@@ -50,14 +50,14 @@ ROS3D.Sphere = function(options) {
   this.position.copy(origin);
   this.setDirection(direction);
 };
-ROS3D.Sphere.prototype.__proto__ = THREE.Mesh.prototype;
+ROS3D.NodePose.prototype.__proto__ = THREE.Mesh.prototype;
 
 /**
- * Set the direction of this sphere to that of the given vector.
+ * Set the direction of this NodePose to that of the given vector.
  *
- * @param direction - the direction to set this sphere
+ * @param direction - the direction to set this NodePose
  */
-ROS3D.Sphere.prototype.setDirection = function(direction) {
+ROS3D.NodePose.prototype.setDirection = function(direction) {
   var axis = new THREE.Vector3();
   if(direction.x === 0 && direction.z === 0){
     axis.set(1, 0, 0);
@@ -74,7 +74,7 @@ ROS3D.Sphere.prototype.setDirection = function(direction) {
  *
  * @param radius - the new radius of the sphere
  */
-ROS3D.Sphere.prototype.setRadius = function(radius) {
+ROS3D.NodePose.prototype.setRadius = function(radius) {
   this.scale.set(radius, radius, radius);
 };
 
@@ -83,14 +83,14 @@ ROS3D.Sphere.prototype.setRadius = function(radius) {
  *
  * @param hex - the hex value of the color to use
  */
-ROS3D.Sphere.prototype.setColor = function(hex) {
+ROS3D.NodePose.prototype.setColor = function(hex) {
   this.material.color.setHex(hex);
 };
 
 /*
  * Free memory of elements in this marker.
  */
-ROS3D.Sphere.prototype.dispose = function() {
+ROS3D.NodePose.prototype.dispose = function() {
   if (this.geometry !== undefined) {
       this.geometry.dispose();
   }

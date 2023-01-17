@@ -4414,7 +4414,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 	const _box$1 = /*@__PURE__*/ new Box3();
 
-	class Sphere$1 {
+	class Sphere {
 
 		constructor( center, radius ) {
 
@@ -10418,7 +10418,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 			if ( this.boundingSphere === null ) {
 
-				this.boundingSphere = new Sphere$1();
+				this.boundingSphere = new Sphere();
 
 			}
 
@@ -11045,7 +11045,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 	const _inverseMatrix = new Matrix4();
 	const _ray = new Ray();
-	const _sphere = new Sphere$1();
+	const _sphere = new Sphere();
 
 	const _vA = new Vector3();
 	const _vB = new Vector3();
@@ -12519,7 +12519,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 	DataTexture.prototype.isDataTexture = true;
 
-	const _sphere$1 = /*@__PURE__*/ new Sphere$1();
+	const _sphere$1 = /*@__PURE__*/ new Sphere();
 	const _vector$5 = /*@__PURE__*/ new Vector3();
 
 	class Frustum {
@@ -26848,7 +26848,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	const _end = new Vector3();
 	const _inverseMatrix$1 = new Matrix4();
 	const _ray$1 = new Ray();
-	const _sphere$2 = new Sphere$1();
+	const _sphere$2 = new Sphere();
 
 	function Line( geometry = new BufferGeometry(), material = new LineBasicMaterial() ) {
 
@@ -27269,7 +27269,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 	const _inverseMatrix$2 = new Matrix4();
 	const _ray$2 = new Ray();
-	const _sphere$3 = new Sphere$1();
+	const _sphere$3 = new Sphere();
 	const _position$1 = new Vector3();
 
 	function Points$1( geometry = new BufferGeometry(), material = new PointsMaterial() ) {
@@ -28180,7 +28180,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 			if ( this.boundingSphere === null ) {
 
-				this.boundingSphere = new Sphere$1();
+				this.boundingSphere = new Sphere();
 
 			}
 
@@ -40915,7 +40915,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 				}
 
-				geometry.boundingSphere = new Sphere$1( center, boundingSphere.radius );
+				geometry.boundingSphere = new Sphere( center, boundingSphere.radius );
 
 			}
 
@@ -49744,7 +49744,7 @@ var ROS3D = (function (exports, ROSLIB) {
 		}
 	} );
 
-	Object.assign( Sphere$1.prototype, {
+	Object.assign( Sphere.prototype, {
 
 		empty: function () {
 
@@ -51864,7 +51864,7 @@ var ROS3D = (function (exports, ROSLIB) {
 		SkeletonHelper: SkeletonHelper,
 		SkinnedMesh: SkinnedMesh,
 		SmoothShading: SmoothShading,
-		Sphere: Sphere$1,
+		Sphere: Sphere,
 		SphereBufferGeometry: SphereBufferGeometry,
 		SphereGeometry: SphereGeometry,
 		Spherical: Spherical,
@@ -61625,18 +61625,18 @@ var ROS3D = (function (exports, ROSLIB) {
 	 * @author Randel Capati - randelmc21@gmail.com
 	 */
 
-	class Sphere extends THREE.Mesh {
+	class NodePose extends THREE.Mesh {
 
 	  /**
-	   * A Sphere is a THREE object that can be used to display a sphere (for position marking).
+	   * A NodePose is a THREE object that can be used to display a Node (plain sphere OR sphere+cone) (for position marking).
 	   *
 	   * @constructor
 	   * @param options - object with following keys:
 	   *
-	   *   * origin (optional) - the origin of the sphere
-	   *   * direction (optional) - the direction vector of the sphere
-	   *   * radius (optional) - the radius of the sphere
-	   *   * material (optional) - the material to use for this sphere
+	   *   * origin (optional) - the origin of the Node
+	   *   * direction (optional) - the direction vector of the Node
+	   *   * radius (optional) - the radius of the Node
+	   *   * material (optional) - the material to use for this Node
 	   */
 	  constructor(options) {
 	    options = options || {};
@@ -61676,9 +61676,9 @@ var ROS3D = (function (exports, ROSLIB) {
 	  };
 
 	  /**
-	   * Set the direction of this sphere to that of the given vector.
+	   * Set the direction of this NodePose to that of the given vector.
 	   *
-	   * @param direction - the direction to set this sphere
+	   * @param direction - the direction to set this NodePose
 	   */
 	  setDirection(direction) {
 	    var axis = new THREE.Vector3();
@@ -62727,7 +62727,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
 	    this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
-	    var tempMarker = new Sphere(this.goalMarkerOptions);
+	    var tempMarker = new NodePose(this.goalMarkerOptions);
 	    this.add(tempMarker);
 	    this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
 	  }
@@ -62748,12 +62748,27 @@ var ROS3D = (function (exports, ROSLIB) {
 	  // addConnectingMarker(newPos=this.mouseDownPos){
 	  //   if(this.goalList.length > 0){
 	  //     var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-	  //     var ori = this.calculateOrientation(oldPos, newPos);
-	  //     var length = 
+	  //     var ori = this.calculateOrientation(oldPos, newPos);    // get orientation from old to new pos
+	  //     var length = ROS3D.calcDistance(oldPos, newPos);
 
 	  //     // Create a line with arrowhead connecting the 2 position
+	  //     this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
+	  //     this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+	  //     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
+	  //     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
+	  //     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
+	  //     this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
+	  //   }
 	  // }
+
+	  calcDistance(p1, p2){
+	    var dx = p2.x - p1.x;
+	    var dy = p2.y - p1.y;
+	    var dz = p2.z - p1.z;
+	    return Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+	  }
 	    
 	  clearAllMarkers(){
 	    // redundant function, just for clarity
@@ -66477,6 +66492,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	exports.NavSatFix = NavSatFix;
 	exports.Navigator = Navigator;
 	exports.Navigator_MW = Navigator_MW;
+	exports.NodePose = NodePose;
 	exports.OcTree = OcTree;
 	exports.OcTreeClient = OcTreeClient;
 	exports.OccupancyGrid = OccupancyGrid;
@@ -66495,7 +66511,6 @@ var ROS3D = (function (exports, ROSLIB) {
 	exports.PoseArray = PoseArray;
 	exports.PoseWithCovariance = PoseWithCovariance;
 	exports.SceneNode = SceneNode;
-	exports.Sphere = Sphere;
 	exports.TFAxes = TFAxes;
 	exports.TriangleList = TriangleList;
 	exports.Urdf = Urdf;

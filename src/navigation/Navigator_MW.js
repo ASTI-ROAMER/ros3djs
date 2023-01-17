@@ -88,7 +88,7 @@ ROS3D.Navigator_MW.prototype.addPoseMarker = function(pos, ori={x:0.0, y:0.0, z:
   this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
   this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
-  var tempMarker = new ROS3D.Sphere(this.goalMarkerOptions);
+  var tempMarker = new ROS3D.NodePose(this.goalMarkerOptions);
   this.add(tempMarker);
   this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
 }
@@ -109,12 +109,27 @@ ROS3D.Navigator_MW.prototype.updateMarkerOri = function(ori, marker=this.latestM
 // ROS3D.Navigator_MW.prototype.addConnectingMarker = function(newPos=this.mouseDownPos){
 //   if(this.goalList.length > 0){
 //     var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-//     var ori = this.calculateOrientation(oldPos, newPos);
-//     var length = 
+//     var ori = this.calculateOrientation(oldPos, newPos);    // get orientation from old to new pos
+//     var length = ROS3D.calcDistance(oldPos, newPos);
 
 //     // Create a line with arrowhead connecting the 2 position
+//     this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
+//     this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+//     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
+//     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
+//     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
+//     this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
+//   }
 // }
+
+ROS3D.Navigator_MW.prototype.calcDistance = function(p1, p2){
+  var dx = p2.x - p1.x;
+  var dy = p2.y - p1.y;
+  var dz = p2.z - p1.z;
+  return Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+}
   
 ROS3D.Navigator_MW.prototype.clearAllMarkers = function(){
   // redundant function, just for clarity

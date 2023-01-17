@@ -4458,14 +4458,14 @@ var _testAxis = /*@__PURE__*/ new Vector3();
 
 var _box$1 = /*@__PURE__*/ new Box3();
 
-var Sphere$1 = function Sphere( center, radius ) {
+var Sphere = function Sphere( center, radius ) {
 
 	this.center = ( center !== undefined ) ? center : new Vector3();
 	this.radius = ( radius !== undefined ) ? radius : - 1;
 
 };
 
-Sphere$1.prototype.set = function set ( center, radius ) {
+Sphere.prototype.set = function set ( center, radius ) {
 
 	this.center.copy( center );
 	this.radius = radius;
@@ -4474,7 +4474,7 @@ Sphere$1.prototype.set = function set ( center, radius ) {
 
 };
 
-Sphere$1.prototype.setFromPoints = function setFromPoints ( points, optionalCenter ) {
+Sphere.prototype.setFromPoints = function setFromPoints ( points, optionalCenter ) {
 
 	var center = this.center;
 
@@ -4502,13 +4502,13 @@ Sphere$1.prototype.setFromPoints = function setFromPoints ( points, optionalCent
 
 };
 
-Sphere$1.prototype.clone = function clone () {
+Sphere.prototype.clone = function clone () {
 
 	return new this.constructor().copy( this );
 
 };
 
-Sphere$1.prototype.copy = function copy ( sphere ) {
+Sphere.prototype.copy = function copy ( sphere ) {
 
 	this.center.copy( sphere.center );
 	this.radius = sphere.radius;
@@ -4517,13 +4517,13 @@ Sphere$1.prototype.copy = function copy ( sphere ) {
 
 };
 
-Sphere$1.prototype.isEmpty = function isEmpty () {
+Sphere.prototype.isEmpty = function isEmpty () {
 
 	return ( this.radius < 0 );
 
 };
 
-Sphere$1.prototype.makeEmpty = function makeEmpty () {
+Sphere.prototype.makeEmpty = function makeEmpty () {
 
 	this.center.set( 0, 0, 0 );
 	this.radius = - 1;
@@ -4532,19 +4532,19 @@ Sphere$1.prototype.makeEmpty = function makeEmpty () {
 
 };
 
-Sphere$1.prototype.containsPoint = function containsPoint ( point ) {
+Sphere.prototype.containsPoint = function containsPoint ( point ) {
 
 	return ( point.distanceToSquared( this.center ) <= ( this.radius * this.radius ) );
 
 };
 
-Sphere$1.prototype.distanceToPoint = function distanceToPoint ( point ) {
+Sphere.prototype.distanceToPoint = function distanceToPoint ( point ) {
 
 	return ( point.distanceTo( this.center ) - this.radius );
 
 };
 
-Sphere$1.prototype.intersectsSphere = function intersectsSphere ( sphere ) {
+Sphere.prototype.intersectsSphere = function intersectsSphere ( sphere ) {
 
 	var radiusSum = this.radius + sphere.radius;
 
@@ -4552,19 +4552,19 @@ Sphere$1.prototype.intersectsSphere = function intersectsSphere ( sphere ) {
 
 };
 
-Sphere$1.prototype.intersectsBox = function intersectsBox ( box ) {
+Sphere.prototype.intersectsBox = function intersectsBox ( box ) {
 
 	return box.intersectsSphere( this );
 
 };
 
-Sphere$1.prototype.intersectsPlane = function intersectsPlane ( plane ) {
+Sphere.prototype.intersectsPlane = function intersectsPlane ( plane ) {
 
 	return Math.abs( plane.distanceToPoint( this.center ) ) <= this.radius;
 
 };
 
-Sphere$1.prototype.clampPoint = function clampPoint ( point, target ) {
+Sphere.prototype.clampPoint = function clampPoint ( point, target ) {
 
 	var deltaLengthSq = this.center.distanceToSquared( point );
 
@@ -4588,7 +4588,7 @@ Sphere$1.prototype.clampPoint = function clampPoint ( point, target ) {
 
 };
 
-Sphere$1.prototype.getBoundingBox = function getBoundingBox ( target ) {
+Sphere.prototype.getBoundingBox = function getBoundingBox ( target ) {
 
 	if ( target === undefined ) {
 
@@ -4612,7 +4612,7 @@ Sphere$1.prototype.getBoundingBox = function getBoundingBox ( target ) {
 
 };
 
-Sphere$1.prototype.applyMatrix4 = function applyMatrix4 ( matrix ) {
+Sphere.prototype.applyMatrix4 = function applyMatrix4 ( matrix ) {
 
 	this.center.applyMatrix4( matrix );
 	this.radius = this.radius * matrix.getMaxScaleOnAxis();
@@ -4621,7 +4621,7 @@ Sphere$1.prototype.applyMatrix4 = function applyMatrix4 ( matrix ) {
 
 };
 
-Sphere$1.prototype.translate = function translate ( offset ) {
+Sphere.prototype.translate = function translate ( offset ) {
 
 	this.center.add( offset );
 
@@ -4629,7 +4629,7 @@ Sphere$1.prototype.translate = function translate ( offset ) {
 
 };
 
-Sphere$1.prototype.equals = function equals ( sphere ) {
+Sphere.prototype.equals = function equals ( sphere ) {
 
 	return sphere.center.equals( this.center ) && ( sphere.radius === this.radius );
 
@@ -10460,7 +10460,7 @@ BufferGeometry.prototype = Object.assign( Object.create( EventDispatcher.prototy
 
 		if ( this.boundingSphere === null ) {
 
-			this.boundingSphere = new Sphere$1();
+			this.boundingSphere = new Sphere();
 
 		}
 
@@ -11087,7 +11087,7 @@ BufferGeometry.prototype = Object.assign( Object.create( EventDispatcher.prototy
 
 var _inverseMatrix = new Matrix4();
 var _ray = new Ray();
-var _sphere = new Sphere$1();
+var _sphere = new Sphere();
 
 var _vA = new Vector3();
 var _vB = new Vector3();
@@ -12545,7 +12545,7 @@ DataTexture.prototype.constructor = DataTexture;
 
 DataTexture.prototype.isDataTexture = true;
 
-var _sphere$1 = /*@__PURE__*/ new Sphere$1();
+var _sphere$1 = /*@__PURE__*/ new Sphere();
 var _vector$5 = /*@__PURE__*/ new Vector3();
 
 var Frustum = function Frustum( p0, p1, p2, p3, p4, p5 ) {
@@ -26899,7 +26899,7 @@ var _start = new Vector3();
 var _end = new Vector3();
 var _inverseMatrix$1 = new Matrix4();
 var _ray$1 = new Ray();
-var _sphere$2 = new Sphere$1();
+var _sphere$2 = new Sphere();
 
 function Line( geometry, material ) {
 	if ( geometry === void 0 ) geometry = new BufferGeometry();
@@ -27323,7 +27323,7 @@ PointsMaterial.prototype.copy = function ( source ) {
 
 var _inverseMatrix$2 = new Matrix4();
 var _ray$2 = new Ray();
-var _sphere$3 = new Sphere$1();
+var _sphere$3 = new Sphere();
 var _position$1 = new Vector3();
 
 function Points$1( geometry, material ) {
@@ -28239,7 +28239,7 @@ Geometry.prototype = Object.assign( Object.create( EventDispatcher.prototype ), 
 
 		if ( this.boundingSphere === null ) {
 
-			this.boundingSphere = new Sphere$1();
+			this.boundingSphere = new Sphere();
 
 		}
 
@@ -41290,7 +41290,7 @@ BufferGeometryLoader.prototype = Object.assign( Object.create( Loader.prototype 
 
 			}
 
-			geometry.boundingSphere = new Sphere$1( center, boundingSphere.radius );
+			geometry.boundingSphere = new Sphere( center, boundingSphere.radius );
 
 		}
 
@@ -49942,7 +49942,7 @@ Object.assign( Box3.prototype, {
 	}
 } );
 
-Object.assign( Sphere$1.prototype, {
+Object.assign( Sphere.prototype, {
 
 	empty: function () {
 
@@ -52062,7 +52062,7 @@ var THREE$1 = /*#__PURE__*/Object.freeze({
 	SkeletonHelper: SkeletonHelper,
 	SkinnedMesh: SkinnedMesh,
 	SmoothShading: SmoothShading,
-	Sphere: Sphere$1,
+	Sphere: Sphere,
 	SphereBufferGeometry: SphereBufferGeometry,
 	SphereGeometry: SphereGeometry,
 	Spherical: Spherical,
@@ -61661,8 +61661,8 @@ var MarkerClient = /*@__PURE__*/(function (EventEmitter2) {
  * @author Randel Capati - randelmc21@gmail.com
  */
 
-var Sphere = /*@__PURE__*/(function (superclass) {
-  function Sphere(options) {
+var NodePose = /*@__PURE__*/(function (superclass) {
+  function NodePose(options) {
     options = options || {};
     var origin = options.origin || new THREE.Vector3(0, 0, 0);
     var direction = options.direction || new THREE.Vector3(1, 0, 0);
@@ -61699,15 +61699,15 @@ var Sphere = /*@__PURE__*/(function (superclass) {
     this.setDirection(direction);
   }
 
-  if ( superclass ) Sphere.__proto__ = superclass;
-  Sphere.prototype = Object.create( superclass && superclass.prototype );
-  Sphere.prototype.constructor = Sphere;
+  if ( superclass ) NodePose.__proto__ = superclass;
+  NodePose.prototype = Object.create( superclass && superclass.prototype );
+  NodePose.prototype.constructor = NodePose;
   /**
-   * Set the direction of this sphere to that of the given vector.
+   * Set the direction of this NodePose to that of the given vector.
    *
-   * @param direction - the direction to set this sphere
+   * @param direction - the direction to set this NodePose
    */
-  Sphere.prototype.setDirection = function setDirection (direction) {
+  NodePose.prototype.setDirection = function setDirection (direction) {
     var axis = new THREE.Vector3();
     if(direction.x === 0 && direction.z === 0){
       axis.set(1, 0, 0);
@@ -61723,7 +61723,7 @@ var Sphere = /*@__PURE__*/(function (superclass) {
    *
    * @param radius - the new radius of the sphere
    */
-  Sphere.prototype.setRadius = function setRadius (radius) {
+  NodePose.prototype.setRadius = function setRadius (radius) {
     this.scale.set(radius, radius, radius);
   };
   /**
@@ -61731,13 +61731,13 @@ var Sphere = /*@__PURE__*/(function (superclass) {
    *
    * @param hex - the hex value of the color to use
    */
-  Sphere.prototype.setColor = function setColor (hex) {
+  NodePose.prototype.setColor = function setColor (hex) {
     this.material.color.setHex(hex);
   };
   /*
    * Free memory of elements in this marker.
    */
-  Sphere.prototype.dispose = function dispose () {
+  NodePose.prototype.dispose = function dispose () {
     if (this.geometry !== undefined) {
         this.geometry.dispose();
     }
@@ -61746,7 +61746,7 @@ var Sphere = /*@__PURE__*/(function (superclass) {
     }
   };
 
-  return Sphere;
+  return NodePose;
 }(THREE.Mesh));
 
 /**
@@ -62634,7 +62634,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
-    var tempMarker = new Sphere(this.goalMarkerOptions);
+    var tempMarker = new NodePose(this.goalMarkerOptions);
     this.add(tempMarker);
     this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
   };
@@ -62658,12 +62658,27 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
   // addConnectingMarker(newPos=this.mouseDownPos){
   //   if(this.goalList.length > 0){
   //     var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-  //     var ori = this.calculateOrientation(oldPos, newPos);
-  //     var length = 
+  //     var ori = this.calculateOrientation(oldPos, newPos);    // get orientation from old to new pos
+  //     var length = ROS3D.calcDistance(oldPos, newPos);
 
   //     // Create a line with arrowhead connecting the 2 position
+  //     this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
+  //     this.goalMarkerOptions.rot = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+  //     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
+  //     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
+  //     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
 
+  //     this.goalMarker = new ROS3D.Arrow(this.goalMarkerOptions);
+  //   }
   // }
+
+  Navigator_MW.prototype.calcDistance = function calcDistance (p1, p2){
+    var dx = p2.x - p1.x;
+    var dy = p2.y - p1.y;
+    var dz = p2.z - p1.z;
+    return Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+  };
     
   Navigator_MW.prototype.clearAllMarkers = function clearAllMarkers (){
     // redundant function, just for clarity
@@ -66020,6 +66035,7 @@ exports.MouseHandler = MouseHandler;
 exports.NavSatFix = NavSatFix;
 exports.Navigator = Navigator;
 exports.Navigator_MW = Navigator_MW;
+exports.NodePose = NodePose;
 exports.OcTree = OcTree;
 exports.OcTreeClient = OcTreeClient;
 exports.OccupancyGrid = OccupancyGrid;
@@ -66038,7 +66054,6 @@ exports.Pose = Pose;
 exports.PoseArray = PoseArray;
 exports.PoseWithCovariance = PoseWithCovariance;
 exports.SceneNode = SceneNode;
-exports.Sphere = Sphere;
 exports.TFAxes = TFAxes;
 exports.TriangleList = TriangleList;
 exports.Urdf = Urdf;
