@@ -75,11 +75,13 @@ ROS3D.NodePoseConnector = function(options) {
     shaftGeometry1.applyMatrix4(m);
     m.setPosition(new THREE.Vector3(0, (shaftLength * 1.5) + offsetLength + headLength, 0));
     shaftGeometry2.applyMatrix4(m);
+    
+    // put the connector together
+    geometry.merge(shaftGeometry1);
+    geometry.merge(shaftGeometry2);
   }
 
-  // put the connector together
-  geometry.merge(shaftGeometry1);
-  geometry.merge(shaftGeometry2);
+  
 
   THREE.Mesh.call(this, geometry, material);
 

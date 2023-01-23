@@ -110,7 +110,7 @@ ROS3D.MouseHandler.prototype.processDomEvent = function(domEvent) {
   if (this.dragging) {
     this.notify(this.lastTarget, domEvent.type, event3D);
     // for check for right or left mouse button
-    if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
+    if ((domEvent.type === 'mouseup' && domEvent.button !== 0) || domEvent.type === 'click' || domEvent.type === 'touchend') {
       this.dragging = false;
     }
     return;
@@ -138,7 +138,7 @@ ROS3D.MouseHandler.prototype.processDomEvent = function(domEvent) {
     var eventStatus = this.notify(target, 'mouseover', event3D);
     if (eventStatus === 0) {
       this.notify(this.lastTarget, 'mouseout', event3D);
-    } else if(eventStatus === 1) {
+    } else if(eventStatus === 1 || eventStatus === 3) {
       // if target was null or no target has caught our event, fall back
       target = this.fallbackTarget;
       if (target !== this.lastTarget) {
@@ -165,7 +165,19 @@ ROS3D.MouseHandler.prototype.processDomEvent = function(domEvent) {
   }
 
   // pass through event
-  this.notify(target, domEvent.type, event3D);
+  // RANDEL: the pass through event (its output status returned by notify) should also affect the state
+  var eventStatus = this.notify(target, domEvent.type, event3D);
+
+  // RANDEL: 3 = force to target fallback target (i.e. OrbitControls)
+  if(eventStatus === 3) {
+    target = this.fallbackTarget;
+    if (target !== this.lastTarget) {
+      this.notify(target, 'mouseover', event3D);          // notify new target (orbitcontrols)
+      this.notify(this.lastTarget, 'mouseout', event3D);  // notify older target that you are leaving it
+      this.notify(target, domEvent.type, event3D);        // redo notification now to the updated target
+    }
+  }
+
   if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
     this.dragging = true;
   }
@@ -188,6 +200,13 @@ ROS3D.MouseHandler.prototype.notify = function(target, type, event3D) {
   // make the event cancelable
   event3D.cancelBubble = false;
   event3D.continueBubble = false;
+  event3D.exitToFallbackTarget = false;
+
+  // RANDEL: add a force to fallback target, essentially an event fail the go send to fall back
+  event3D.forceExitToFallbackTarget = function() {
+    event3D.exitToFallbackTarget = true;
+  };
+
   event3D.stopPropagation = function() {
     event3D.cancelBubble = true;
   };
@@ -205,7 +224,11 @@ ROS3D.MouseHandler.prototype.notify = function(target, type, event3D) {
     if (event3D.currentTarget.dispatchEvent
         && event3D.currentTarget.dispatchEvent instanceof Function) {
       event3D.currentTarget.dispatchEvent(event3D);
-      if (event3D.cancelBubble) {
+      if (event3D.exitToFallbackTarget) {
+        event3D.currentTarget = null;
+        return 3;
+      }
+      else if (event3D.cancelBubble) {
         this.dispatchEvent(event3D);
         return 0; // Event Accepted
       }

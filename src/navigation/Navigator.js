@@ -189,17 +189,11 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
           // this.updateGoalMarker(this.mouseDownPos, this.defaultOri, this.intermediateColor)
 
           event3D.stopPropagation();
-        } 
+        } else {
+          event3D.forceExitToFallbackTarget();
+        }
         break;
 
-      // case 'dblclick':
-      //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-      //   var pose = new ROSLIB.Pose({
-      //     position : new ROSLIB.Vector3(coords)
-      //   });
-      //   // send the goal
-      //   this.sendGoal(pose);
-      //   console.log('nav: mouseDBLCLICK');
 
       case 'mouseout':
       case 'mouseup':
@@ -217,35 +211,16 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
 
           var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
 
-
-
-          // var xDelta = mouseUpPos.x - this.mouseDownPos.x;
-          // var yDelta = mouseUpPos.y - this.mouseDownPos.y;
-          // // var zDelta = mouseUpPos.z - this.mouseDownPos.z;
-          
-          // // calc orientation from mouseDownPos and mouseUpPos
-          // var thetaRadians  = Math.atan2(xDelta,yDelta);
-
-          // if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
-          //   thetaRadians += (3 * Math.PI / 2);
-          // } else {
-          //   thetaRadians -= (Math.PI/2);
-          // }
-  
-          // var qz =  Math.sin(-thetaRadians/2.0);
-          // var qw =  Math.cos(-thetaRadians/2.0);
-  
-          // var orientation = new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw});
   
           var pose = new ROSLIB.Pose({
             position :    this.mouseDownPos,
             orientation : orientation
           });
 
-          console.log('nav: mouseUP');
-          console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
-          console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
-          console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
+          // console.log('nav: mouseUP');
+          // console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
+          // console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
+          // console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
           
           // send the goal
           this.sendGoal(pose);
@@ -270,8 +245,9 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
         }
         break;
 
-      // default:
-        // break;               // DO NOT DO event3D.continuePropagation!!!
+      default:
+        event3D.forceExitToFallbackTarget();
+        break;               // DO NOT DO event3D.continuePropagation!!!
     }
   } 
 }

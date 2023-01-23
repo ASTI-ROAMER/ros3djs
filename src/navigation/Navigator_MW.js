@@ -211,7 +211,12 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
         // but only accept it if it is a left mouse click
         // we do this so that middle/wheel and right click events are not accepted, and instead caught by camera
         // if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 && event3D.domEvent.buttons === 1){
-        if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0){
+        // DO NOT ACCEPT MOUSEOVER if you will not process that input further (dont handle it in the cases below.)
+        //    This is because once the mouseover (prior the actual mouse input) is accepted, MouseHandler.notify()
+        //    will only return 0 or 2. BUT to be able to give the mouse signals to orbit control, it HAS TO RETURN 1
+        //    which WILL ONLY HAPPEN if the mouseover was not accepted in the first place.
+        // So in mouseover case, list all possible mouse signals you want to further process.
+        if ((event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 /*&& event3D.domEvent.buttons === 1*/)){
           event3D.stopPropagation();
         }
         break;
@@ -231,7 +236,9 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           //store pose goal to a var to display
           
           event3D.stopPropagation();
-        } 
+        } else {
+          event3D.forceExitToFallbackTarget();
+        }
         break;
 
 
@@ -288,11 +295,13 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
           this.updateMarkerOri(orientation, this.latestMarker, this.intermediateColor);  
           // this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor)
           // this.updateAllMarkers();
+          event3D.stopPropagation();
         }
         break;
 
-      // default:
-        // break;               // DO NOT DO event3D.continuePropagation!!!
+      default:
+        event3D.forceExitToFallbackTarget();
+        break;               // DO NOT DO event3D.continuePropagation!!!
     }
   } 
 }
@@ -328,7 +337,7 @@ ROS3D.Navigator_MW.prototype.activate = function(event3D){
 
 ROS3D.Navigator_MW.prototype.deactivate = function(event3D){
   this.isActive = false;
-  this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
+  // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
 }
 
 ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
@@ -336,7 +345,7 @@ ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
 
   // REMOVE THISSSSS, FOR DEBUGGING ONLY
   if (!this.isActive){
-    this.clearGoalList();
+    // this.clearGoalList();
   }
 }
 

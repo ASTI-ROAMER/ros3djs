@@ -61714,11 +61714,13 @@ var NodePoseConnector = /*@__PURE__*/(function (superclass) {
       shaftGeometry1.applyMatrix4(m);
       m.setPosition(new THREE.Vector3(0, (shaftLength * 1.5) + offsetLength + headLength, 0));
       shaftGeometry2.applyMatrix4(m);
+      
+      // put the connector together
+      geometry.merge(shaftGeometry1);
+      geometry.merge(shaftGeometry2);
     }
 
-    // put the connector together
-    geometry.merge(shaftGeometry1);
-    geometry.merge(shaftGeometry2);
+    
 
     superclass.call(this, geometry, material);
 
@@ -62543,7 +62545,7 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
     if (this.dragging) {
       this.notify(this.lastTarget, domEvent.type, event3D);
       // for check for right or left mouse button
-      if ((domEvent.type === 'mouseup' && domEvent.button === 2) || domEvent.type === 'click' || domEvent.type === 'touchend') {
+      if ((domEvent.type === 'mouseup' && domEvent.button !== 0) || domEvent.type === 'click' || domEvent.type === 'touchend') {
         this.dragging = false;
       }
       return;
@@ -62571,7 +62573,7 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
       var eventStatus = this.notify(target, 'mouseover', event3D);
       if (eventStatus === 0) {
         this.notify(this.lastTarget, 'mouseout', event3D);
-      } else if(eventStatus === 1) {
+      } else if(eventStatus === 1 || eventStatus === 3) {
         // if target was null or no target has caught our event, fall back
         target = this.fallbackTarget;
         if (target !== this.lastTarget) {
@@ -62598,7 +62600,19 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
     }
 
     // pass through event
-    this.notify(target, domEvent.type, event3D);
+    // RANDEL: the pass through event (its output status returned by notify) should also affect the state
+    var eventStatus = this.notify(target, domEvent.type, event3D);
+
+    // RANDEL: 3 = force to target fallback target (i.e. OrbitControls)
+    if(eventStatus === 3) {
+      target = this.fallbackTarget;
+      if (target !== this.lastTarget) {
+        this.notify(target, 'mouseover', event3D);          // notify new target (orbitcontrols)
+        this.notify(this.lastTarget, 'mouseout', event3D);  // notify older target that you are leaving it
+        this.notify(target, domEvent.type, event3D);        // redo notification now to the updated target
+      }
+    }
+
     if (domEvent.type === 'mousedown' || domEvent.type === 'touchstart' || domEvent.type === 'touchmove') {
       this.dragging = true;
     }
@@ -62620,6 +62634,13 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
     // make the event cancelable
     event3D.cancelBubble = false;
     event3D.continueBubble = false;
+    event3D.exitToFallbackTarget = false;
+
+    // RANDEL: add a force to fallback target, essentially an event fail the go send to fall back
+    event3D.forceExitToFallbackTarget = function() {
+      event3D.exitToFallbackTarget = true;
+    };
+
     event3D.stopPropagation = function() {
       event3D.cancelBubble = true;
     };
@@ -62637,7 +62658,11 @@ var MouseHandler = /*@__PURE__*/(function (superclass) {
       if (event3D.currentTarget.dispatchEvent
           && event3D.currentTarget.dispatchEvent instanceof Function) {
         event3D.currentTarget.dispatchEvent(event3D);
-        if (event3D.cancelBubble) {
+        if (event3D.exitToFallbackTarget) {
+          event3D.currentTarget = null;
+          return 3;
+        }
+        else if (event3D.cancelBubble) {
           this.dispatchEvent(event3D);
           return 0; // Event Accepted
         }
@@ -62891,7 +62916,12 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
           // but only accept it if it is a left mouse click
           // we do this so that middle/wheel and right click events are not accepted, and instead caught by camera
           // if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 && event3D.domEvent.buttons === 1){
-          if (event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0){
+          // DO NOT ACCEPT MOUSEOVER if you will not process that input further (dont handle it in the cases below.)
+          //    This is because once the mouseover (prior the actual mouse input) is accepted, MouseHandler.notify()
+          //    will only return 0 or 2. BUT to be able to give the mouse signals to orbit control, it HAS TO RETURN 1
+          //    which WILL ONLY HAPPEN if the mouseover was not accepted in the first place.
+          // So in mouseover case, list all possible mouse signals you want to further process.
+          if ((event3D.domEvent.type === 'mousedown' && event3D.domEvent.button === 0 /*&& event3D.domEvent.buttons === 1*/)){
             event3D.stopPropagation();
           }
           break;
@@ -62911,7 +62941,9 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
             //store pose goal to a var to display
             
             event3D.stopPropagation();
-          } 
+          } else {
+            event3D.forceExitToFallbackTarget();
+          }
           break;
 
 
@@ -62968,11 +63000,13 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
             this.updateMarkerOri(orientation, this.latestMarker, this.intermediateColor);  
             // this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor)
             // this.updateAllMarkers();
+            event3D.stopPropagation();
           }
           break;
 
-        // default:
-          // break;               // DO NOT DO event3D.continuePropagation!!!
+        default:
+          event3D.forceExitToFallbackTarget();
+          break;               // DO NOT DO event3D.continuePropagation!!!
       }
     } 
   };
@@ -63008,16 +63042,14 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
 
   Navigator_MW.prototype.deactivate = function deactivate (event3D){
     this.isActive = false;
-    this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
+    // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
   };
 
   Navigator_MW.prototype.toggleActivation = function toggleActivation (event3D){
     this.isActive = !this.isActive;
 
     // REMOVE THISSSSS, FOR DEBUGGING ONLY
-    if (!this.isActive){
-      this.clearGoalList();
-    }
+    if (!this.isActive);
   };
 
   return Navigator_MW;
@@ -63193,17 +63225,11 @@ var Navigator = /*@__PURE__*/(function (superclass) {
             // this.updateGoalMarker(this.mouseDownPos, this.defaultOri, this.intermediateColor)
 
             event3D.stopPropagation();
-          } 
+          } else {
+            event3D.forceExitToFallbackTarget();
+          }
           break;
 
-        // case 'dblclick':
-        //   var coords = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
-        //   var pose = new ROSLIB.Pose({
-        //     position : new ROSLIB.Vector3(coords)
-        //   });
-        //   // send the goal
-        //   this.sendGoal(pose);
-        //   console.log('nav: mouseDBLCLICK');
 
         case 'mouseout':
         case 'mouseup':
@@ -63221,35 +63247,16 @@ var Navigator = /*@__PURE__*/(function (superclass) {
 
             var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
 
-
-
-            // var xDelta = mouseUpPos.x - this.mouseDownPos.x;
-            // var yDelta = mouseUpPos.y - this.mouseDownPos.y;
-            // // var zDelta = mouseUpPos.z - this.mouseDownPos.z;
-            
-            // // calc orientation from mouseDownPos and mouseUpPos
-            // var thetaRadians  = Math.atan2(xDelta,yDelta);
-
-            // if (thetaRadians >= 0 && thetaRadians <= Math.PI) {
-            //   thetaRadians += (3 * Math.PI / 2);
-            // } else {
-            //   thetaRadians -= (Math.PI/2);
-            // }
-    
-            // var qz =  Math.sin(-thetaRadians/2.0);
-            // var qw =  Math.cos(-thetaRadians/2.0);
-    
-            // var orientation = new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw});
     
             var pose = new ROSLIB__namespace.Pose({
               position :    this.mouseDownPos,
               orientation : orientation
             });
 
-            console.log('nav: mouseUP');
-            console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
-            console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
-            console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
+            // console.log('nav: mouseUP');
+            // console.log('nav down: ' + this.mouseDownPos.x + ', ' + this.mouseDownPos.y + ', ' + this.mouseDownPos.z);
+            // console.log('nav up: ' + mouseUpPos.x + ', ' + mouseUpPos.y + ', ' + mouseUpPos.z);
+            // console.log('nav ori: ' + orientation.z + ', ' + orientation.w);
             
             // send the goal
             this.sendGoal(pose);
@@ -63274,8 +63281,9 @@ var Navigator = /*@__PURE__*/(function (superclass) {
           }
           break;
 
-        // default:
-          // break;               // DO NOT DO event3D.continuePropagation!!!
+        default:
+          event3D.forceExitToFallbackTarget();
+          break;               // DO NOT DO event3D.continuePropagation!!!
       }
     } 
   };
