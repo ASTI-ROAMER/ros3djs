@@ -190,6 +190,7 @@ ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
 
 ROS3D.Navigator_MW.prototype.clearGoalList = function(){
   this.goalList = new Array();
+  this.rootObject.emit('navigationUpd');
   this.clear();         // clears markers
 }
 

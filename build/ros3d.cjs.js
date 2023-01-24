@@ -62895,6 +62895,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
 
   Navigator_MW.prototype.clearGoalList = function clearGoalList (){
     this.goalList = new Array();
+    this.rootObject.emit('navigationUpd');
     this.clear();         // clears markers
   };
 

@@ -63004,6 +63004,7 @@ var ROS3D = (function (exports, ROSLIB) {
 
 	  clearGoalList(){
 	    this.goalList = new Array();
+	    this.rootObject.emit('navigationUpd');
 	    this.clear();         // clears markers
 	  }
 
