@@ -187,3 +187,24 @@ ROS3D.Viewer.prototype.resetCamera = function(camPos=this.defaultCameraPos, camT
   this.camera.position.copy(camPos);
   this.cameraControls.center.copy(camTarget);
 };
+
+ROS3D.Viewer.prototype.resetCameraToRobot = function(z_offset=10){
+  var pos = this.getRobotPos();
+  if (pos){
+    var camPos = pos.clone();
+    camPos.z += z_offset;
+    this.resetCamera(camPos, pos);
+  } else {
+    this.resetCamera();
+  }
+
+};
+
+ROS3D.Viewer.prototype.getRobotPos = function(robotBaseName='Base_Link') {
+  var robot = this.scene.getObjectByName(robotBaseName);
+  if (robot){
+    var pos = new THREE.Vector3();
+    robot.getWorldPosition(pos)
+    return pos;
+  }
+};

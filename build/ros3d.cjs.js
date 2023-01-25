@@ -63420,6 +63420,7 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
           object : newGrid,
           pose : this.offsetPose
         });
+        this.sceneNode.name = 'SceneNode_map';
         // this.sceneNode.add(this.navigator);
         this.rootObject.add(this.sceneNode);
       } else {
@@ -66138,24 +66139,29 @@ Viewer.prototype.resetCamera = function resetCamera (camPos, camTarget){
   this.cameraControls.thetaDelta = -Math.PI/2;
   this.camera.position.copy(camPos);
   this.cameraControls.center.copy(camTarget);
-  console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
-  console.log('%%% camPos: ' + camPos.x.toFixed(3) + ', ' + camPos.y.toFixed(3) + ', ' + camPos.z.toFixed(3) + ', ');
-  console.log('%%% center: ' + camTarget.x.toFixed(3) + ', ' + camTarget.y.toFixed(3) + ', ' + camTarget.z.toFixed(3) + ', ');
-    
-    
+};
+Viewer.prototype.resetCameraToRobot = function resetCameraToRobot (z_offset){
+    if ( z_offset === void 0 ) z_offset=10;
 
-  // this.cameraControls = null; // remove camera control so it wont update when drawing scene
+  var pos = this.getRobotPos();
+  if (pos){
+    var camPos = pos.clone();
+    camPos.z += z_offset;
+    this.resetCamera(camPos, pos);
+  } else {
+    this.resetCamera();
+  }
 
-  // this.camera.position.x = camPos.x;
-  // this.camera.position.y = camPos.y;
-  // this.camera.position.z = camPos.z;
-  // this.camera.updateProjectionMatrix();
+};
+Viewer.prototype.getRobotPos = function getRobotPos (robotBaseName) {
+    if ( robotBaseName === void 0 ) robotBaseName='Base_Link';
 
-  // this.camera.lookAt(camTarget);
-  // this.camera.updateMatrixWorld();
-  // this.cameraControls.center = camTarget;
-  // this.cameraControls.update();
-    
+  var robot = this.scene.getObjectByName(robotBaseName);
+  if (robot){
+    var pos = new THREE.Vector3();
+    robot.getWorldPosition(pos);
+    return pos;
+  }
 };
 
 exports.Arrow = Arrow;

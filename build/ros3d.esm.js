@@ -63396,6 +63396,7 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
           object : newGrid,
           pose : this.offsetPose
         });
+        this.sceneNode.name = 'SceneNode_map';
         // this.sceneNode.add(this.navigator);
         this.rootObject.add(this.sceneNode);
       } else {
@@ -66114,24 +66115,29 @@ Viewer.prototype.resetCamera = function resetCamera (camPos, camTarget){
   this.cameraControls.thetaDelta = -Math.PI/2;
   this.camera.position.copy(camPos);
   this.cameraControls.center.copy(camTarget);
-  console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
-  console.log('%%% camPos: ' + camPos.x.toFixed(3) + ', ' + camPos.y.toFixed(3) + ', ' + camPos.z.toFixed(3) + ', ');
-  console.log('%%% center: ' + camTarget.x.toFixed(3) + ', ' + camTarget.y.toFixed(3) + ', ' + camTarget.z.toFixed(3) + ', ');
-    
-    
+};
+Viewer.prototype.resetCameraToRobot = function resetCameraToRobot (z_offset){
+    if ( z_offset === void 0 ) z_offset=10;
 
-  // this.cameraControls = null; // remove camera control so it wont update when drawing scene
+  var pos = this.getRobotPos();
+  if (pos){
+    var camPos = pos.clone();
+    camPos.z += z_offset;
+    this.resetCamera(camPos, pos);
+  } else {
+    this.resetCamera();
+  }
 
-  // this.camera.position.x = camPos.x;
-  // this.camera.position.y = camPos.y;
-  // this.camera.position.z = camPos.z;
-  // this.camera.updateProjectionMatrix();
+};
+Viewer.prototype.getRobotPos = function getRobotPos (robotBaseName) {
+    if ( robotBaseName === void 0 ) robotBaseName='Base_Link';
 
-  // this.camera.lookAt(camTarget);
-  // this.camera.updateMatrixWorld();
-  // this.cameraControls.center = camTarget;
-  // this.cameraControls.update();
-    
+  var robot = this.scene.getObjectByName(robotBaseName);
+  if (robot){
+    var pos = new THREE.Vector3();
+    robot.getWorldPosition(pos);
+    return pos;
+  }
 };
 
 export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, Navigator, Navigator_MW, NodePose, NodePoseConnector, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridClientNav, OccupancyGridClientNav_MW, OccupancyGridNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };

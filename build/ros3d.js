@@ -63571,6 +63571,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	          object : newGrid,
 	          pose : this.offsetPose
 	        });
+	        this.sceneNode.name = 'SceneNode_map';
 	        // this.sceneNode.add(this.navigator);
 	        this.rootObject.add(this.sceneNode);
 	      } else {
@@ -66611,24 +66612,27 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.cameraControls.thetaDelta = -Math.PI/2;
 	    this.camera.position.copy(camPos);
 	    this.cameraControls.center.copy(camTarget);
-	    console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
-	    console.log('%%% camPos: ' + camPos.x.toFixed(3) + ', ' + camPos.y.toFixed(3) + ', ' + camPos.z.toFixed(3) + ', ');
-	    console.log('%%% center: ' + camTarget.x.toFixed(3) + ', ' + camTarget.y.toFixed(3) + ', ' + camTarget.z.toFixed(3) + ', ');
-	    
-	    
+	  };
 
-	    // this.cameraControls = null;   // remove camera control so it wont update when drawing scene
+	  resetCameraToRobot(z_offset=10){
+	    var pos = this.getRobotPos();
+	    if (pos){
+	      var camPos = pos.clone();
+	      camPos.z += z_offset;
+	      this.resetCamera(camPos, pos);
+	    } else {
+	      this.resetCamera();
+	    }
 
-	    // this.camera.position.x = camPos.x;
-	    // this.camera.position.y = camPos.y;
-	    // this.camera.position.z = camPos.z;
-	    // this.camera.updateProjectionMatrix();
+	  };
 
-	    // this.camera.lookAt(camTarget);
-	    // this.camera.updateMatrixWorld();
-	    // this.cameraControls.center = camTarget;
-	    // this.cameraControls.update();
-	    
+	  getRobotPos(robotBaseName='Base_Link') {
+	    var robot = this.scene.getObjectByName(robotBaseName);
+	    if (robot){
+	      var pos = new THREE.Vector3();
+	      robot.getWorldPosition(pos);
+	      return pos;
+	    }
 	  };
 	}
 

@@ -114,6 +114,7 @@ ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
         object : newGrid,
         pose : this.offsetPose
       });
+      this.sceneNode.name = 'SceneNode_map';
       // this.sceneNode.add(this.navigator);
       this.rootObject.add(this.sceneNode);
     } else {
