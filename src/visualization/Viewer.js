@@ -38,11 +38,9 @@ ROS3D.Viewer = function(options) {
   var near = options.near || 0.01;
   var far = options.far || 1000;
   var alpha = options.alpha || 1.0;
-  var cameraPosition = options.cameraPose || {
-    x : 3,
-    y : 3,
-    z : 3
-  };
+  var cameraPosition = options.cameraPose || new THREE.Vector3(0,0,15);
+  this.defaultCameraPos = cameraPosition;
+  this.defaultCameraTarget = options.cameraTarget || new THREE.Vector3(0, 0, 0);    // where camera looks at
   var cameraZoomSpeed = options.cameraZoomSpeed || 0.5;
   var displayPanAndZoomFrame = (options.displayPanAndZoomFrame === undefined) ? true : !!options.displayPanAndZoomFrame;
   var lineTypePanAndZoomFrame = options.lineTypePanAndZoomFrame || 'full';
@@ -70,9 +68,11 @@ ROS3D.Viewer = function(options) {
   this.cameraControls = new ROS3D.OrbitControls({
     scene : this.scene,
     camera : this.camera,
+    center: this.defaultCameraTarget.clone(),
     displayPanAndZoomFrame : displayPanAndZoomFrame,
     lineTypePanAndZoomFrame: lineTypePanAndZoomFrame
   });
+  this.cameraControls.thetaDelta = -Math.PI/2;
   this.cameraControls.userZoomSpeed = cameraZoomSpeed;
 
   // lights
@@ -176,4 +176,14 @@ ROS3D.Viewer.prototype.resize = function(width, height) {
   this.camera.aspect = width / height;
   this.camera.updateProjectionMatrix();
   this.renderer.setSize(width, height);
+};
+
+
+ROS3D.Viewer.prototype.resetCamera = function(camPos=this.defaultCameraPos, camTarget=this.defaultCameraTarget){
+  // Change the center of the orbit controls AND camera position
+  // THIS IS BECAUSE OrbitControls will always make camera look towards its OrbitControls.center
+
+  this.cameraControls.thetaDelta = -Math.PI/2;
+  this.camera.position.copy(camPos);
+  this.cameraControls.center.copy(camTarget);
 };

@@ -17,6 +17,7 @@
     "@rollup/plugin-node-resolve": "^15.0.0",
     "chai": "^4.3.0",
     "debug": "^4.3.0",
+    "eslint": "^8.32.0",
     "grunt": "^1.0.0",
     "grunt-contrib-clean": "^2.0.0",
     "grunt-contrib-watch": "^1.0.0",

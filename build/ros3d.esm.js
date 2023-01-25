@@ -65464,7 +65464,7 @@ var OrbitControls = /*@__PURE__*/(function (superclass) {
     options = options || {};
     var scene = options.scene;
     this.camera = options.camera;
-    this.center = new THREE.Vector3();
+    this.center = options.center || new THREE.Vector3();
     this.userZoom = true;
     this.userZoomSpeed = options.userZoomSpeed || 1.0;
     this.userRotate = true;
@@ -65969,11 +65969,9 @@ var Viewer = function Viewer(options) {
   var near = options.near || 0.01;
   var far = options.far || 1000;
   var alpha = options.alpha || 1.0;
-  var cameraPosition = options.cameraPose || {
-    x : 3,
-    y : 3,
-    z : 3
-  };
+  var cameraPosition = options.cameraPose || new THREE.Vector3(0,0,15);
+  this.defaultCameraPos = cameraPosition;
+  this.defaultCameraTarget = options.cameraTarget || new THREE.Vector3(0, 0, 0);  // where camera looks at
   var cameraZoomSpeed = options.cameraZoomSpeed || 0.5;
   var displayPanAndZoomFrame = (options.displayPanAndZoomFrame === undefined) ? true : !!options.displayPanAndZoomFrame;
   var lineTypePanAndZoomFrame = options.lineTypePanAndZoomFrame || 'full';
@@ -66001,9 +65999,11 @@ var Viewer = function Viewer(options) {
   this.cameraControls = new OrbitControls({
     scene : this.scene,
     camera : this.camera,
+    center: this.defaultCameraTarget.clone(),
     displayPanAndZoomFrame : displayPanAndZoomFrame,
     lineTypePanAndZoomFrame: lineTypePanAndZoomFrame
   });
+  this.cameraControls.thetaDelta = -Math.PI/2;
   this.cameraControls.userZoomSpeed = cameraZoomSpeed;
 
   // lights
@@ -66102,6 +66102,36 @@ Viewer.prototype.resize = function resize (width, height) {
   this.camera.aspect = width / height;
   this.camera.updateProjectionMatrix();
   this.renderer.setSize(width, height);
+};
+
+Viewer.prototype.resetCamera = function resetCamera (camPos, camTarget){
+    if ( camPos === void 0 ) camPos=this.defaultCameraPos;
+    if ( camTarget === void 0 ) camTarget=this.defaultCameraTarget;
+
+  // Change the center of the orbit controls AND camera position
+  // THIS IS BECAUSE OrbitControls will always make camera look towards its OrbitControls.center
+
+  this.cameraControls.thetaDelta = -Math.PI/2;
+  this.camera.position.copy(camPos);
+  this.cameraControls.center.copy(camTarget);
+  console.log('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%');
+  console.log('%%% camPos: ' + camPos.x.toFixed(3) + ', ' + camPos.y.toFixed(3) + ', ' + camPos.z.toFixed(3) + ', ');
+  console.log('%%% center: ' + camTarget.x.toFixed(3) + ', ' + camTarget.y.toFixed(3) + ', ' + camTarget.z.toFixed(3) + ', ');
+    
+    
+
+  // this.cameraControls = null; // remove camera control so it wont update when drawing scene
+
+  // this.camera.position.x = camPos.x;
+  // this.camera.position.y = camPos.y;
+  // this.camera.position.z = camPos.z;
+  // this.camera.updateProjectionMatrix();
+
+  // this.camera.lookAt(camTarget);
+  // this.camera.updateMatrixWorld();
+  // this.cameraControls.center = camTarget;
+  // this.cameraControls.update();
+    
 };
 
 export { Arrow, Arrow2, Axes, ColorOcTree, DepthCloud, Grid, Highlighter, INTERACTIVE_MARKER_BUTTON, INTERACTIVE_MARKER_BUTTON_CLICK, INTERACTIVE_MARKER_FIXED, INTERACTIVE_MARKER_INHERIT, INTERACTIVE_MARKER_KEEP_ALIVE, INTERACTIVE_MARKER_MENU, INTERACTIVE_MARKER_MENU_SELECT, INTERACTIVE_MARKER_MOUSE_DOWN, INTERACTIVE_MARKER_MOUSE_UP, INTERACTIVE_MARKER_MOVE_3D, INTERACTIVE_MARKER_MOVE_AXIS, INTERACTIVE_MARKER_MOVE_PLANE, INTERACTIVE_MARKER_MOVE_ROTATE, INTERACTIVE_MARKER_MOVE_ROTATE_3D, INTERACTIVE_MARKER_NONE, INTERACTIVE_MARKER_POSE_UPDATE, INTERACTIVE_MARKER_ROTATE_3D, INTERACTIVE_MARKER_ROTATE_AXIS, INTERACTIVE_MARKER_VIEW_FACING, InteractiveMarker, InteractiveMarkerClient, InteractiveMarkerControl, InteractiveMarkerHandle, InteractiveMarkerMenu, LaserScan, MARKER_ARROW, MARKER_CUBE, MARKER_CUBE_LIST, MARKER_CYLINDER, MARKER_LINE_LIST, MARKER_LINE_STRIP, MARKER_MESH_RESOURCE, MARKER_POINTS, MARKER_SPHERE, MARKER_SPHERE_LIST, MARKER_TEXT_VIEW_FACING, MARKER_TRIANGLE_LIST, Marker, MarkerArrayClient, MarkerClient, MeshLoader, MeshResource, MouseHandler, NavSatFix, Navigator, Navigator_MW, NodePose, NodePoseConnector, OcTree, OcTreeClient, OccupancyGrid, OccupancyGridClient, OccupancyGridClientNav, OccupancyGridClientNav_MW, OccupancyGridNav, Odometry, OrbitControls, Path, Point, PointCloud2, Points, Polygon, Pose, PoseArray, PoseWithCovariance, SceneNode, TFAxes, TriangleList, Urdf, UrdfClient, Viewer, closestAxisPoint, findClosestPoint, intersectPlane, makeColorMaterial };

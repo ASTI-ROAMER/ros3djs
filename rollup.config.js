@@ -58,6 +58,8 @@ export default [
       name: 'ROS3D',
       file: outputFiles.esModule,
       format: 'es',
+      // sourcemap: true,
+      // sourcemapFile: outputFiles.esModule + '.map',
       globals: {
         ...moduleGlobals,
       }
