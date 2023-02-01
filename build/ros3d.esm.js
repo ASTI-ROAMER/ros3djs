@@ -62842,6 +62842,13 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     console.log('z: ',pose.position.z);
 
   };
+  //Mitz - delete pose on array
+  Navigator_MW.prototype.deletePose = function deletePose (pose){
+    this.goalList = new Array();
+    var index = this.goalList.length;
+    this.goalList.splice(index, 1);
+    this.rootObject.emit('deletePose');
+  };
 
 
   // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
@@ -62871,6 +62878,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
 
   Navigator_MW.prototype.clearGoalList = function clearGoalList (){
     this.goalList = new Array();
+    this.rootObject.emit('navigationUpd');
     this.clear();         // clears markers
   };
 
