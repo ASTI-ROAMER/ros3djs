@@ -160,6 +160,13 @@ ROS3D.Navigator_MW.prototype.updateGoalList = function(pose){
   console.log('z: ',pose.position.z);
 
 }
+//Mitz - delete pose on array
+ROS3D.Navigator_MW.prototype.deletePose = function(pose){
+  this.goalList = new Array();
+  var index = this.goalList.length
+  var goalData = this.goalList.splice(index, 1)
+  this.rootObject.emit('deletePose');
+}
 
 
 // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
