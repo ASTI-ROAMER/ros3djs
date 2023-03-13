@@ -62855,8 +62855,8 @@ var ROS3D = (function (exports, ROSLIB) {
 	    var defaultNavOptions = { navServerName:      '/move_base',
 	                              navActionName:      'move_base_msgs/MoveBaseAction',
 	                              navInitState:       false,
-	                              color:              0xcc00ff,
-	                              intermediateColor:  0x8f00b3,
+	                              color:              0xA8D098,
+	                              intermediateColor:  0xA8D098,
 	                              defaultDirection:   new THREE.Vector3(1,0,0),};
 	    // Update/merge the defaultNavOptions with the given navOptions
 	    var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
@@ -62907,7 +62907,10 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.add(tempMarker);
 	    this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
 	  }
+	  //Mitz - trying delete pose marker
+	  deletePoseMarker(){
 
+	  }
 	  // Applies an orientation (quaternion) as a direction to the latest marker or the given marker
 	  updateMarkerOri(ori, marker=this.latestMarker, c=this.color){
 	    if (marker !== null){
@@ -62969,20 +62972,20 @@ var ROS3D = (function (exports, ROSLIB) {
 	  updateGoalList(pose){
 	    this.goalList.push(pose);
 	    this.rootObject.emit('navigationUpd');
-	    console.log('index: ', this.goalList.length - 1);
-	    console.log('x: ',pose.position.x);
-	    console.log('y: ',pose.position.y);
-	    console.log('z: ',pose.position.z);
+
+	    // console.log('index: ', this.goalList.length - 1);
+	    // console.log('x: ',pose.position.x);
+	    // console.log('y: ',pose.position.y);
+	    // console.log('z: ',pose.position.z);
 
 	  }
 	  //Mitz - delete pose on array
-	  deletePose(pose){
-	    this.goalList = new Array();
-	    var index = this.goalList.length;
-	    this.goalList.splice(index, 1);
-	    this.rootObject.emit('deletePose');
+	  deletePose(index_no){
+	    this.goalList.splice(index_no, 1);
+	   // console.log('index deleted ', index_no);
+	    this.rootObject.emit('navigationUpd');
+	    
 	  }
-
 
 	  // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
 	  calculateOrientation(p1, p2){
