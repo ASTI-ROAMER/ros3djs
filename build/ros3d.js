@@ -62855,8 +62855,8 @@ var ROS3D = (function (exports, ROSLIB) {
 	    var defaultNavOptions = { navServerName:      '/move_base',
 	                              navActionName:      'move_base_msgs/MoveBaseAction',
 	                              navInitState:       false,
-	                              color:              0xA8D098,
-	                              intermediateColor:  0xA8D098,
+	                              color:              0x476648,
+	                              intermediateColor:  0x8FB787,
 	                              defaultDirection:   new THREE.Vector3(1,0,0),};
 	    // Update/merge the defaultNavOptions with the given navOptions
 	    var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
@@ -62907,10 +62907,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	    this.add(tempMarker);
 	    this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
 	  }
-	  //Mitz - trying delete pose marker
-	  deletePoseMarker(){
 
-	  }
 	  // Applies an orientation (quaternion) as a direction to the latest marker or the given marker
 	  updateMarkerOri(ori, marker=this.latestMarker, c=this.color){
 	    if (marker !== null){
@@ -62924,22 +62921,36 @@ var ROS3D = (function (exports, ROSLIB) {
 	  }
 
 	  // TODO: USE THIS TO ADD POINT CONNECTORS LATER
-	  addConnectorMarker(newPos=this.mouseDownPos, c=this.color){
-	    if(this.goalList.length > 0){
-	      var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-
-	      var connOptions = {};
-	      connOptions.p1 = new THREE.Vector3(oldPos.x, oldPos.y, oldPos.z);
-	      connOptions.p2 = new THREE.Vector3(newPos.x, newPos.y, newPos.z);
-	      connOptions.material = new THREE.MeshBasicMaterial({color: c});
-
-	      var connMarker = new NodePoseConnector(connOptions);
-	      
-	      // if p1 and p2 are too close, NodePoseConnector will have no geometry, so only add it to navigator iff there is geometry
-	      if(connMarker.geometry){
-	        this.add(connMarker);
+	  // - newPos defaults to last mouse down position!
+	  // - oldPose defaults to LAST GOAL LIST ENTRY ***POSITION***
+	  addConnectorMarker(newPos=this.mouseDownPos, oldPos=null, c=this.color){
+	    // if(this.goalList.length > 0){
+	    
+	    // If there is no given oldPos (null), use latest entry of goalList.
+	    if (oldPos === null){
+	      try {
+	        // If goalList is empty, getting its last entry's position will produce an error.
+	        oldPos = this.goalList.slice(-1)[0].position;
+	      }
+	      catch(e){
+	        // Since oldPos is non-existent, stop creating the connector.
+	        console.log('Nav_MW: goalList is empty. Will not create a connector.');
+	        return;
 	      }
 	    }
+	    // var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array 
+	    var connOptions = {};
+	    connOptions.p1 = new THREE.Vector3(oldPos.x, oldPos.y, oldPos.z);
+	    connOptions.p2 = new THREE.Vector3(newPos.x, newPos.y, newPos.z);
+	    connOptions.material = new THREE.MeshBasicMaterial({color: c});
+
+	    var connMarker = new NodePoseConnector(connOptions);
+	    
+	    // if p1 and p2 are too close, NodePoseConnector will have no geometry, so only add it to navigator iff there is geometry
+	    if(connMarker.geometry){
+	      this.add(connMarker);
+	    }
+	    // }
 	  }
 
 	  // calcDistance(p1, p2){
@@ -62959,10 +62970,17 @@ var ROS3D = (function (exports, ROSLIB) {
 	  // RANDEL: Re-constructs all markers of all the waypoints.
 	  updateAllMarkers(){
 	    this.clear();
-	    
+	    var old_pose = null;
+	    var pose = null;
+
 	    for (let i=0; i < this.goalList.length;  i++){
-	      var pose = this.goalList[i];
+	      old_pose = pose;
+	      pose = this.goalList[i];
 	      this.addPoseMarker(pose.position, pose.orientation);
+	      if (old_pose !== null){
+	        this.addConnectorMarker(pose.position, old_pose.position);
+	      }
+
 	    }
 	    // this.rootObject.emit('change');
 	  }
@@ -62982,7 +63000,8 @@ var ROS3D = (function (exports, ROSLIB) {
 	  //Mitz - delete pose on array
 	  deletePose(index_no){
 	    this.goalList.splice(index_no, 1);
-	   // console.log('index deleted ', index_no);
+
+	    this.updateAllMarkers();                    // Brute-force update the markers
 	    this.rootObject.emit('navigationUpd');
 	    
 	  }
@@ -63150,7 +63169,7 @@ var ROS3D = (function (exports, ROSLIB) {
 	      poi = event3D.intersection.point;       // revert to mouse down POI if it fails
 	    }
 	    this.poiPose = true;
-	    return poi
+	    return poi;
 	    
 	  }
 

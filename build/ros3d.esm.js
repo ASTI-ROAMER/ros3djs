@@ -62710,8 +62710,8 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     var defaultNavOptions = { navServerName:      '/move_base',
                               navActionName:      'move_base_msgs/MoveBaseAction',
                               navInitState:       false,
-                              color:              0xA8D098,
-                              intermediateColor:  0xA8D098,
+                              color:              0x476648,
+                              intermediateColor:  0x8FB787,
                               defaultDirection:   new THREE.Vector3(1,0,0),};
     // Update/merge the defaultNavOptions with the given navOptions
     var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
@@ -62768,10 +62768,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     this.add(tempMarker);
     this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
   };
-  //Mitz - trying delete pose marker
-  Navigator_MW.prototype.deletePoseMarker = function deletePoseMarker (){
 
-  };
   // Applies an orientation (quaternion) as a direction to the latest marker or the given marker
   Navigator_MW.prototype.updateMarkerOri = function updateMarkerOri (ori, marker, c){
     if ( marker === void 0 ) marker=this.latestMarker;
@@ -62788,25 +62785,40 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
   };
 
   // TODO: USE THIS TO ADD POINT CONNECTORS LATER
-  Navigator_MW.prototype.addConnectorMarker = function addConnectorMarker (newPos, c){
+  // - newPos defaults to last mouse down position!
+  // - oldPose defaults to LAST GOAL LIST ENTRY ***POSITION***
+  Navigator_MW.prototype.addConnectorMarker = function addConnectorMarker (newPos, oldPos, c){
     if ( newPos === void 0 ) newPos=this.mouseDownPos;
+    if ( oldPos === void 0 ) oldPos=null;
     if ( c === void 0 ) c=this.color;
 
-    if(this.goalList.length > 0){
-      var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array
-
-      var connOptions = {};
-      connOptions.p1 = new THREE.Vector3(oldPos.x, oldPos.y, oldPos.z);
-      connOptions.p2 = new THREE.Vector3(newPos.x, newPos.y, newPos.z);
-      connOptions.material = new THREE.MeshBasicMaterial({color: c});
-
-      var connMarker = new NodePoseConnector(connOptions);
-      
-      // if p1 and p2 are too close, NodePoseConnector will have no geometry, so only add it to navigator iff there is geometry
-      if(connMarker.geometry){
-        this.add(connMarker);
+    // if(this.goalList.length > 0){
+    
+    // If there is no given oldPos (null), use latest entry of goalList.
+    if (oldPos === null){
+      try {
+        // If goalList is empty, getting its last entry's position will produce an error.
+        oldPos = this.goalList.slice(-1)[0].position;
+      }
+      catch(e){
+        // Since oldPos is non-existent, stop creating the connector.
+        console.log('Nav_MW: goalList is empty. Will not create a connector.');
+        return;
       }
     }
+    // var oldPos = this.goalList.slice(-1)[0].position;       // get last pose in array 
+    var connOptions = {};
+    connOptions.p1 = new THREE.Vector3(oldPos.x, oldPos.y, oldPos.z);
+    connOptions.p2 = new THREE.Vector3(newPos.x, newPos.y, newPos.z);
+    connOptions.material = new THREE.MeshBasicMaterial({color: c});
+
+    var connMarker = new NodePoseConnector(connOptions);
+    
+    // if p1 and p2 are too close, NodePoseConnector will have no geometry, so only add it to navigator iff there is geometry
+    if(connMarker.geometry){
+      this.add(connMarker);
+    }
+    // }
   };
 
   // calcDistance(p1, p2){
@@ -62826,10 +62838,17 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
   // RANDEL: Re-constructs all markers of all the waypoints.
   Navigator_MW.prototype.updateAllMarkers = function updateAllMarkers (){
     this.clear();
-    
+    var old_pose = null;
+    var pose = null;
+
     for (var i=0; i < this.goalList.length;  i++){
-      var pose = this.goalList[i];
+      old_pose = pose;
+      pose = this.goalList[i];
       this.addPoseMarker(pose.position, pose.orientation);
+      if (old_pose !== null){
+        this.addConnectorMarker(pose.position, old_pose.position);
+      }
+
     }
     // this.rootObject.emit('change');
   };
@@ -62849,7 +62868,8 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
   //Mitz - delete pose on array
   Navigator_MW.prototype.deletePose = function deletePose (index_no){
     this.goalList.splice(index_no, 1);
-   // console.log('index deleted ', index_no);
+
+    this.updateAllMarkers();                    // Brute-force update the markers
     this.rootObject.emit('navigationUpd');
     
   };
@@ -63017,7 +63037,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
       poi = event3D.intersection.point;       // revert to mouse down POI if it fails
     }
     this.poiPose = true;
-    return poi
+    return poi;
     
   };
 
