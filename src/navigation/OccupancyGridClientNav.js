@@ -9,7 +9,8 @@
  * Emits the following events:
  *
  *  * 'change' - there was an update or change in the marker
- *
+ *  * 'navigationUpd' - Navigation object internally updated/changed  (eg: goal list changed). Marker may not have changed.
+ * 
  * @constructor
  * @param options - object with following keys:
  *    %%% from OccupancyGridClient %%%
