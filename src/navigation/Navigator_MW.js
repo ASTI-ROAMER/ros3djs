@@ -39,6 +39,7 @@ ROS3D.Navigator_MW = function(options) {
   var defaultNavOptions = { navServerName:      '/move_base',
                             navActionName:      'move_base_msgs/MoveBaseAction',
                             navInitState:       false,
+                            scaleMultiplier:    1.0,
                             color:              0x476648,
                             intermediateColor:  0x8FB787,
                             defaultDirection:   new THREE.Vector3(1,0,0),};
@@ -48,6 +49,7 @@ ROS3D.Navigator_MW = function(options) {
   
   var serverName = navOptions.navServerName;   // we don't need to store serverName since it is encoded in this.actionClient
   var actionName = navOptions.navActionName;
+  this.scaleMultiplier = navOptions.scaleMultiplier;
   this.color = navOptions.color;
   this.intermediateColor = navOptions.intermediateColor;
   this.markerFrameID = navOptions.markerFrameID || this.navigatorFrameID;
@@ -221,6 +223,7 @@ ROS3D.Navigator_MW.prototype.addPoseMarker = function(pos, ori={x:0.0, y:0.0, z:
   this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
   this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
   this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
+  this.goalMarkerOptions.scaleMultiplier = this.scaleMultiplier;
 
   var tempMarker = new ROS3D.NodePose(this.goalMarkerOptions);
   this.add(tempMarker);

@@ -19,12 +19,16 @@
  */
 ROS3D.NodePose = function(options) {
   options = options || {};
+  var scaleMultiplier = options.scaleMultiplier || 1.0;
   var origin = options.origin || new THREE.Vector3(0, 0, 0);
   var direction = options.direction || new THREE.Vector3(1, 0, 0);
   var radius = options.radius || 0.1;
   var arrowHeadHeight = options.arrowHeadHeight || 0.2;       // WRT center of sphere
   var material = options.material || new THREE.MeshBasicMaterial();
   var withArrowHead = options.arrowhead || true;              // teardrop shape when with arrowhead
+
+  radius *= scaleMultiplier;
+  arrowHeadHeight *= scaleMultiplier;
 
   // create and merge geometry
   var geometry = new THREE.SphereGeometry(radius, 64, 32);

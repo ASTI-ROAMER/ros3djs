@@ -61795,12 +61795,16 @@ var NodePoseConnector = /*@__PURE__*/(function (superclass) {
 var NodePose = /*@__PURE__*/(function (superclass) {
   function NodePose(options) {
     options = options || {};
+    var scaleMultiplier = options.scaleMultiplier || 1.0;
     var origin = options.origin || new THREE.Vector3(0, 0, 0);
     var direction = options.direction || new THREE.Vector3(1, 0, 0);
     var radius = options.radius || 0.1;
     var arrowHeadHeight = options.arrowHeadHeight || 0.2;       // WRT center of sphere
     var material = options.material || new THREE.MeshBasicMaterial();
     var withArrowHead = options.arrowhead || true;              // teardrop shape when with arrowhead
+
+    radius *= scaleMultiplier;
+    arrowHeadHeight *= scaleMultiplier;
 
     // create and merge geometry
     var geometry = new THREE.SphereGeometry(radius, 64, 32);
@@ -62735,6 +62739,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     var defaultNavOptions = { navServerName:      '/move_base',
                               navActionName:      'move_base_msgs/MoveBaseAction',
                               navInitState:       false,
+                              scaleMultiplier:    1.0,
                               color:              0x476648,
                               intermediateColor:  0x8FB787,
                               defaultDirection:   new THREE.Vector3(1,0,0),};
@@ -62744,6 +62749,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     
     var serverName = navOptions.navServerName;   // we don't need to store serverName since it is encoded in this.actionClient
     var actionName = navOptions.navActionName;
+    this.scaleMultiplier = navOptions.scaleMultiplier;
     this.color = navOptions.color;
     this.intermediateColor = navOptions.intermediateColor;
     this.markerFrameID = navOptions.markerFrameID || this.navigatorFrameID;
@@ -62921,6 +62927,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
     this.goalMarkerOptions.direction.applyQuaternion(this.goalMarkerOptions.rot);
     this.goalMarkerOptions.material = new THREE.MeshBasicMaterial({color: c});
+    this.goalMarkerOptions.scaleMultiplier = this.scaleMultiplier;
 
     var tempMarker = new NodePose(this.goalMarkerOptions);
     this.add(tempMarker);
