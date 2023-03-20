@@ -42,6 +42,7 @@ ROS3D.Navigator_MW = function(options) {
                             scaleMultiplier:    1.0,
                             color:              0x476648,
                             intermediateColor:  0x8FB787,
+                            highlightColor:     0xffd11a,
                             defaultDirection:   new THREE.Vector3(1,0,0),};
   // Update/merge the defaultNavOptions with the given navOptions
   var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
@@ -52,6 +53,7 @@ ROS3D.Navigator_MW = function(options) {
   this.scaleMultiplier = navOptions.scaleMultiplier;
   this.color = navOptions.color;
   this.intermediateColor = navOptions.intermediateColor;
+  this.highlightColor = navOptions.highlightColor;
   this.markerFrameID = navOptions.markerFrameID || this.navigatorFrameID;
   this.isActive = navOptions.navInitState;   // toggle this if you want navigation or not
 
@@ -77,14 +79,14 @@ ROS3D.Navigator_MW = function(options) {
 
             // Manipulate nodeMarkerList corresponding to the ROSLIB.Pose in goalList.
             switch(prop){
-              case 'push':
+              case 'push': {
                 // Push can have multiple arguments that are individually pushed to the array.
                 // Create a marker for each pushed element on the goalList!!!
                 // Assume one element per push.
-                var newROSPose = args[0];
-                var oldROSPose = that.goalList.at(-1); 
-                var poseMarker = that.addPoseMarker(newROSPose.position, newROSPose.orientation);
-                var connMarker = null;
+                let newROSPose = args[0];
+                let oldROSPose = that.goalList.at(-1); 
+                let poseMarker = that.addPoseMarker(newROSPose.position, newROSPose.orientation);
+                let connMarker = null;
                 if(oldROSPose){
                   connMarker = that.addConnectorMarker(newROSPose.position, oldROSPose.position);
                 }
@@ -100,48 +102,120 @@ ROS3D.Navigator_MW = function(options) {
                 //   that.nodeMarkerList.push({'node': poseMarker, 'conn0': connMarker});
                 // });
                 that.rootObject.emit('navigationUpd');
-                break;
-              case 'splice':
-                // RANDEL: not full implementation for splice
+              } break;
+              case 'splice': {
+                // RANDEL: NOW IT IS FULL IMPLEMENTATION OF SPLICE
                 // Sometimes, splice is called with undefined: arr.splice(undefined, 1). It parses the undefined as 0.
-                var start = args[0] || 0;
-                var deleteCount = args[1] || 0;
-                var nodeIndexBefore = start - 1;
-                var nodeIndexAfter = start + deleteCount;
-                var oldROSPose = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
-                var newROSPose = that.goalList[nodeIndexAfter];
-                var nodeAfterMarkerObj = that.nodeMarkerList.at(nodeIndexAfter);
-                for(var i=start, c=0; c<deleteCount; c++, i++){
-                  // Remove node from scene
-                  try{
-                    Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker))
-                    // that.remove(that.nodeMarkerList[i].node);       // simple removal of node only
-                  } catch(err){
-                    console.log('No marker to delete.')
-                  }
-                }
-                
-                // Modify conn0 of the next node, if it exists.
-                if(nodeAfterMarkerObj){
-                  try{
-                    // Delete the old connector first.
-                    that.remove(nodeAfterMarkerObj.conn0);
-                    var connMarker = null;
-                    if(oldROSPose){
-                      // Create the new connector.
-                      connMarker = that.addConnectorMarker(newROSPose.position, oldROSPose.position);
-                    }
-                    nodeAfterMarkerObj.conn0 = connMarker;
-                  } catch(err){
-                    console.log('Somethingsomething...')
-                  }
-                }
+                let [start, deleteCount, ...items] = args;
+                let nodeIndexBefore, nodeIndexAfter, oldROSPose, newROSPose, nodeAfterMarkerObj, connMarker;
 
-                // Then remove marker reference from the nodeMarkerList
-                that.nodeMarkerList.splice(start, deleteCount);
+                switch(args.length){
+                  case 0:
+                    break;      // Don't do anything when no args
+
+                  case 1:
+                    start = start || 0;       // arr.splice(undefined) == arr.splice(0, arr.length)
+                    deleteCount = that.goalList.length - start;
+                    // Deliberate fall-through
+
+                  case 2:
+                    // Sometimes, splice is called with undefined: arr.splice(undefined, 1). It parses the undefined as 0.
+                    start = start || 0;
+                    deleteCount = deleteCount || 0;
+                    // Get undeleted poses (FROM YET-TO-BE-MODIFIED ARRAY) before and after the deleted items, 
+                    //  so we can adjust their connectors
+                    nodeIndexBefore = start - 1;
+                    nodeIndexAfter = start + deleteCount;
+                    oldROSPose = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
+                    newROSPose = that.goalList[nodeIndexAfter];
+                    nodeAfterMarkerObj = that.nodeMarkerList.at(nodeIndexAfter);
+
+                    // Remove all nodes and connectors from scene for the given indeces
+                    for(let i=start, c=0; c<deleteCount; c++, i++){
+                      try{
+                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker))
+                        // that.remove(that.nodeMarkerList[i].node);       // simple removal of node only
+                      } catch(err){
+                        console.log('No marker to delete.')
+                      }
+                    }
+                    // Modify conn0 of the next node, if it exists.
+                    if(nodeAfterMarkerObj){
+                      try{
+                        // Delete the old connector first.
+                        that.remove(nodeAfterMarkerObj.conn0);
+                        connMarker = null;
+                        if(oldROSPose){
+                          // Create the new connector, only if there is a previous node
+                          connMarker = that.addConnectorMarker(newROSPose.position, oldROSPose.position);
+                        }
+                        nodeAfterMarkerObj.conn0 = connMarker;
+                      } catch(err){
+                        console.log('Somethingsomething...')
+                      }
+                    }
+                    that.nodeMarkerList.splice(start, deleteCount);
+                    break;
+                  
+                  default:    // 3 or above ( with items to add)
+                    // Sometimes, splice is called with undefined: arr.splice(undefined, 1). It parses the undefined as 0.
+                    start = start || 0;
+                    deleteCount = deleteCount || 0;
+                    // Get undeleted poses (FROM YET-TO-BE-MODIFIED ARRAY) before and after the deleted items, 
+                    //  so we can adjust their connectors
+                    nodeIndexBefore = start - 1;
+                    nodeIndexAfter = start + deleteCount;
+                    oldROSPose = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
+                    newROSPose = that.goalList[nodeIndexAfter];
+                    nodeAfterMarkerObj = that.nodeMarkerList.at(nodeIndexAfter);
+
+                    // Remove all nodes and connectors from scene for the given indeces
+                    for(let i=start, c=0; c<deleteCount; c++, i++){
+                      try{
+                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker))
+                        // that.remove(that.nodeMarkerList[i].node);       // simple removal of node only
+                      } catch(err){
+                        console.log('No marker to delete.')
+                      }
+                    }
+
+                    // create node markers for each item, then put them into a list
+                    let lastInsertedPose = null;
+                    let addedPoseMarkers= [];
+                    connMarker = null;
+                    for(let k in items){
+                      let poseMarker = that.addPoseMarker(items[k].position, items[k].orientation);
+                      if(oldROSPose){
+                        connMarker = that.addConnectorMarker(items[k].position, oldROSPose.position);
+                      }
+                      lastInsertedPose = {'node': poseMarker, 'conn0': connMarker};
+                      addedPoseMarkers.push(lastInsertedPose);
+                      // reset and update
+                      connMarker = null;
+                      oldROSPose = items[k];
+                    }
+
+                    // Modify conn0 of the next node, if it exists.
+                    if(nodeAfterMarkerObj){
+                      try{
+                        // Delete the old connector first.
+                        that.remove(nodeAfterMarkerObj.conn0);
+                        connMarker = null;
+                        if(oldROSPose){
+                          // Create the new connector, only if there is a previous node
+                          connMarker = that.addConnectorMarker(newROSPose.position, oldROSPose.position);
+                        }
+                        nodeAfterMarkerObj.conn0 = connMarker;
+                      } catch(err){
+                        console.log('Somethingsomething...')
+                      }
+                    }
+                    that.nodeMarkerList.splice(start, deleteCount, ...addedPoseMarkers);
+                    break;
+                }
                 that.rootObject.emit('navigationUpd');
-                break;
-              case 'pop':
+              } break;
+              case 'pop': {
                 var tempNodeObj = that.nodeMarkerList.pop();
                 try{
                   for(var marker in Object.values(tempNodeObj)){
@@ -150,6 +224,8 @@ ROS3D.Navigator_MW = function(options) {
                 } catch(err){
                   console.log('No marker to delete.')
                 }
+                that.rootObject.emit('navigationUpd');
+              } break;
               default:
                 that.rootObject.emit('navigationUpd');
             }
@@ -461,6 +537,51 @@ ROS3D.Navigator_MW.prototype.calculateCurrentPOI = function(event3D){
   this.poiPose = true
   return poi;
   
+}
+
+
+ROS3D.Navigator_MW.prototype.highlightNodeAtIndex = function(index){
+  var nodeMarkerObj = this.nodeMarkerList[index];
+  if(nodeMarkerObj){
+    try{
+      var nodeMarker = nodeMarkerObj['node'];
+      nodeMarker.setColor(this.highlightColor);
+      this.rootObject.emit('change');
+    } catch(err){}
+  }
+}
+
+
+ROS3D.Navigator_MW.prototype.unhighlightNodeAtIndex = function(index){
+  var nodeMarkerObj = this.nodeMarkerList[index];
+  if(nodeMarkerObj){
+    try{
+      var nodeMarker = nodeMarkerObj['node'];
+      nodeMarker.setColor(this.color);
+      this.rootObject.emit('change');
+    } catch(err){}
+  }
+}
+
+ROS3D.Navigator_MW.prototype.unhighlightAllNodes = function(){
+  Object.values(this.nodeMarkerList).forEach(nodeMarkerObj =>{
+    try{
+      var nodeMarker = nodeMarkerObj['node'];
+      nodeMarker.setColor(this.color);
+    } catch(err){}
+  })
+  this.rootObject.emit('change');
+}
+
+
+ROS3D.Navigator_MW.prototype.moveNodeFromIndexTo = function(fromIndex=-1, toIndex=-1, count=1){
+  // count is the number of elements to move, starting from the [fromIndex]
+  if( (fromIndex >= 0) && (fromIndex < this.goalList.length) && (toIndex >= 0) && (toIndex < this.goalList.length) && (count >= 0)){
+    const elemsArrayToMove = this.goalList.splice(fromIndex, count);    // get element to be moved, delete it from goalList
+
+    this.goalList.splice(toIndex, 0, ...elemsArrayToMove);
+    return true;
+  }
 }
 
 
