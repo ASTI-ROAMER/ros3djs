@@ -4,7 +4,7 @@ const {
   inheritance,
   injectImports,
   transpileToEs6
-} = require('./es6-transpiler');
+} = require('./es6-transpiler.cjs');
 
 // Export Grunt config
 module.exports = function(grunt) {
