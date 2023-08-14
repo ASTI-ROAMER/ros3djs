@@ -17,7 +17,7 @@ ROS3D.OccupancyGridNav = function(options) {
   ROS3D.OccupancyGrid.call(this, options);
   // var message = options.message;              // the ros OccupancyGrid message that we need to construct the mesh
   this.navigator = options.navigator || null;
-  this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
+  // this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
 
 
   var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',

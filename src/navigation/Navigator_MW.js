@@ -73,9 +73,9 @@ ROS3D.Navigator_MW = function(options) {
       if (typeof val === 'function') {
         if (['pop', 'push', 'splice'].includes(prop)) {
           return function () {
-            var args = Array.from(arguments) 
+            var args = Array.from(arguments);
             console.log('===' + prop);
-            console.log('Args: [' + args + ']')
+            console.log('Args: [' + args + ']');
 
             // Manipulate nodeMarkerList corresponding to the ROSLIB.Pose in goalList.
             switch(prop){
@@ -90,7 +90,7 @@ ROS3D.Navigator_MW = function(options) {
                 if(oldROSPose){
                   connMarker = that.addConnectorMarker(newROSPose.position, oldROSPose.position);
                 }
-                that.nodeMarkerList.push({'node': poseMarker, 'conn0': connMarker})
+                that.nodeMarkerList.push({'node': poseMarker, 'conn0': connMarker});
                 // args.forEach((el) => {
                 //   var poseMarker = that.addPoseMarker(el.position, el.orientation);
                 //   var oldROSPose = that.goalList.at(-1);
@@ -133,10 +133,10 @@ ROS3D.Navigator_MW = function(options) {
                     // Remove all nodes and connectors from scene for the given indeces
                     for(let i=start, c=0; c<deleteCount; c++, i++){
                       try{
-                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker))
+                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker));
                         // that.remove(that.nodeMarkerList[i].node);       // simple removal of node only
                       } catch(err){
-                        console.log('No marker to delete.')
+                        console.log('No marker to delete.');
                       }
                     }
                     // Modify conn0 of the next node, if it exists.
@@ -151,7 +151,7 @@ ROS3D.Navigator_MW = function(options) {
                         }
                         nodeAfterMarkerObj.conn0 = connMarker;
                       } catch(err){
-                        console.log('Somethingsomething...')
+                        console.log('Somethingsomething...');
                       }
                     }
                     that.nodeMarkerList.splice(start, deleteCount);
@@ -172,10 +172,10 @@ ROS3D.Navigator_MW = function(options) {
                     // Remove all nodes and connectors from scene for the given indeces
                     for(let i=start, c=0; c<deleteCount; c++, i++){
                       try{
-                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker))
+                        Object.values(that.nodeMarkerList[i]).forEach(marker => that.remove(marker));
                         // that.remove(that.nodeMarkerList[i].node);       // simple removal of node only
                       } catch(err){
-                        console.log('No marker to delete.')
+                        console.log('No marker to delete.');
                       }
                     }
 
@@ -207,7 +207,7 @@ ROS3D.Navigator_MW = function(options) {
                         }
                         nodeAfterMarkerObj.conn0 = connMarker;
                       } catch(err){
-                        console.log('Somethingsomething...')
+                        console.log('Somethingsomething...');
                       }
                     }
                     that.nodeMarkerList.splice(start, deleteCount, ...addedPoseMarkers);
@@ -222,7 +222,7 @@ ROS3D.Navigator_MW = function(options) {
                     that.remove(marker); 
                   }
                 } catch(err){
-                  console.log('No marker to delete.')
+                  console.log('No marker to delete.');
                 }
                 that.rootObject.emit('navigationUpd');
               } break;
@@ -230,7 +230,7 @@ ROS3D.Navigator_MW = function(options) {
                 that.rootObject.emit('navigationUpd');
             }
             return Array.prototype[prop].apply(target, arguments);      // This line (the apply) mutates the goalList
-          }
+          };
         }
         return val.bind(target);
       }
@@ -305,7 +305,7 @@ ROS3D.Navigator_MW.prototype.addPoseMarker = function(pos, ori={x:0.0, y:0.0, z:
   this.add(tempMarker);
   return tempMarker;
   // this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
-}
+};
 
 // Applies an orientation (quaternion) as a direction to the latest marker or the given marker
 ROS3D.Navigator_MW.prototype.updateMarkerOri = function(ori, marker=this.latestMarker, c=this.color){
@@ -317,7 +317,7 @@ ROS3D.Navigator_MW.prototype.updateMarkerOri = function(ori, marker=this.latestM
     marker.setColor(c);
     this.rootObject.emit('change');
   }
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.addConnectorMarker = function(newPos, oldPos,  c=this.color){
@@ -344,7 +344,7 @@ ROS3D.Navigator_MW.prototype.addConnectorMarker = function(newPos, oldPos,  c=th
 ROS3D.Navigator_MW.prototype.clearAllMarkers = function(){
   // redundant function, just for clarity
   this.clear();   // remember, Navigator is a THREE.Object3D, clearing its children will remove any markers
-}
+};
 
 
 // RANDEL: Re-constructs all markers of all the waypoints.  ***UNUSED/REDUNDANT*****
@@ -364,18 +364,18 @@ ROS3D.Navigator_MW.prototype.updateAllMarkers = function(){
 ROS3D.Navigator_MW.prototype.pushToGoalList = function(pose){
   this.goalList.push(pose);             // Mutating the PROXY goalList should emit a signal
   // this.rootObject.emit('navigationUpd');
-}
+};
 
 //Mitz - delete pose on array
 ROS3D.Navigator_MW.prototype.deletePose = function(index_no){
   this.goalList.splice(index_no, 1);
   // this.rootObject.emit('navigationUpd');
-}
+};
 
 // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
 ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
   if ( p1 === void 0 || p2 === void 0) {
-    console.log('One or both given required points was not given, returning default value.')
+    console.log('One or both given required points was not given, returning default value.');
     return (new ROSLIB.Quaternion());
   }
   var xDelta = p2.x - p1.x;
@@ -399,14 +399,14 @@ ROS3D.Navigator_MW.prototype.calculateOrientation = function(p1, p2){
   var qw =  Math.cos(-thetaRadians/2.0);
 
   return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.clearGoalList = function(){
   this.goalList.splice(0, this.goalList.length);
   // this.rootObject.emit('navigationUpd');
   // this.clear();         // clears markers
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
@@ -514,7 +514,7 @@ ROS3D.Navigator_MW.prototype.mouseEventHandlerUnbound = function(event3D){
         break;               // DO NOT DO event3D.continuePropagation!!!
     }
   } 
-}
+};
 
 ROS3D.Navigator_MW.prototype.calculateCurrentPOI = function(event3D){
   // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
@@ -530,14 +530,14 @@ ROS3D.Navigator_MW.prototype.calculateCurrentPOI = function(event3D){
   newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
 
   if (newIntersections) {
-    poi = newIntersections[0].point
+    poi = newIntersections[0].point;
   } else {
     poi = event3D.intersection.point;       // revert to mouse down POI if it fails
   }
-  this.poiPose = true
+  this.poiPose = true;
   return poi;
   
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.highlightNodeAtIndex = function(index){
@@ -549,7 +549,7 @@ ROS3D.Navigator_MW.prototype.highlightNodeAtIndex = function(index){
       this.rootObject.emit('change');
     } catch(err){}
   }
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.unhighlightNodeAtIndex = function(index){
@@ -561,7 +561,7 @@ ROS3D.Navigator_MW.prototype.unhighlightNodeAtIndex = function(index){
       this.rootObject.emit('change');
     } catch(err){}
   }
-}
+};
 
 ROS3D.Navigator_MW.prototype.unhighlightAllNodes = function(){
   Object.values(this.nodeMarkerList).forEach(nodeMarkerObj =>{
@@ -569,9 +569,9 @@ ROS3D.Navigator_MW.prototype.unhighlightAllNodes = function(){
       var nodeMarker = nodeMarkerObj['node'];
       nodeMarker.setColor(this.color);
     } catch(err){}
-  })
+  });
   this.rootObject.emit('change');
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.moveNodeFromIndexTo = function(fromIndex=-1, toIndex=-1, count=1){
@@ -582,18 +582,18 @@ ROS3D.Navigator_MW.prototype.moveNodeFromIndexTo = function(fromIndex=-1, toInde
     this.goalList.splice(toIndex, 0, ...elemsArrayToMove);
     return true;
   }
-}
+};
 
 
 ROS3D.Navigator_MW.prototype.activate = function(event3D){
   this.isActive = true;
   
-}
+};
 
 ROS3D.Navigator_MW.prototype.deactivate = function(event3D){
   this.isActive = false;
   // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
-}
+};
 
 ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
   this.isActive = !this.isActive;
@@ -602,7 +602,7 @@ ROS3D.Navigator_MW.prototype.toggleActivation = function(event3D){
   if (!this.isActive){
     // this.clearGoalList();
   }
-}
+};
 
 
   

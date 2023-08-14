@@ -124,7 +124,7 @@ ROS3D.Navigator.prototype.updateGoalMarker = function(pos, orientation, c=this.c
   this.add(this.goalMarker);
 
   this.rootObject.emit('change');
-}
+};
 
 
 // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
@@ -152,7 +152,7 @@ ROS3D.Navigator.prototype.calculateOrientation = function(p1, p2){
   var qw =  Math.cos(-thetaRadians/2.0);
 
   return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
-}
+};
 
 
 ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
@@ -241,7 +241,7 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
           var mouseUpPos = new ROSLIB.Vector3({x: poi.x, y: poi.y, z: 0});
 
           var orientation = this.calculateOrientation(this.mouseDownPos, mouseUpPos);
-          this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor)
+          this.updateGoalMarker(this.mouseDownPos, orientation, this.intermediateColor);
         }
         break;
 
@@ -250,7 +250,7 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
         break;               // DO NOT DO event3D.continuePropagation!!!
     }
   } 
-}
+};
 
 ROS3D.Navigator.prototype.calculateCurrentPOI = function(event3D){
   // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
@@ -266,23 +266,23 @@ ROS3D.Navigator.prototype.calculateCurrentPOI = function(event3D){
   newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
 
   if (newIntersections) {
-    poi = newIntersections[0].point
+    poi = newIntersections[0].point;
   } else {
     poi = event3D.intersection.point;       // revert to mouse down POI if it fails
   }
-  return poi
-}
+  return poi;
+};
 
 
 ROS3D.Navigator.prototype.activate = function(event3D){
   this.isActive = true;
-}
+};
 
 ROS3D.Navigator.prototype.deactivate = function(event3D){
   this.isActive = false;
-}
+};
 
 ROS3D.Navigator.prototype.toggleActivation = function(event3D){
   this.isActive = !this.isActive;
   console.log('Navigator isActive: ' + this.isActive);
-}
+};

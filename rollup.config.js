@@ -74,49 +74,49 @@ export default [
       filesize(),
     ],
   },
-  // build browser as IIFE module for script tag inclusion, unminified
-  // Usage:
-  // <script src="../build/ros3d.js"></script>
-  {
-    input,
-    output: {
-      name: 'ROS3D',
-      file: outputFiles.browserGlobal,
-      format: 'iife',
-      globals: {
-        ...browserGlobals,
-      },
-    },
-    external: [
-      ...Object.keys(browserGlobals),
-    ],
-    plugins: [
-      nodeResolve({ browser: true }),
-      commonjs(),
-      filesize(),
-    ],
-  },
-  // build browser as IIFE module for script tag inclusion, minified
-  // Usage:
-  // <script src="../build/ros3d.min.js"></script>
-  {
-    input,
-    output: {
-      name: 'ROS3D',
-      file: outputFiles.browserGlobalMinified,
-      format: 'iife',
-      globals: {
-        ...browserGlobals,
-      },
-    },
-    external: [
-      ...Object.keys(browserGlobals),
-    ],
-    plugins: [
-      nodeResolve({ browser: true }),
-      commonjs(),
-      filesize(),
-      terser(),
-    ],
-  },
+  // // build browser as IIFE module for script tag inclusion, unminified
+  // // Usage:
+  // // <script src="../build/ros3d.js"></script>
+  // {
+  //   input,
+  //   output: {
+  //     name: 'ROS3D',
+  //     file: outputFiles.browserGlobal,
+  //     format: 'iife',
+  //     globals: {
+  //       ...browserGlobals,
+  //     },
+  //   },
+  //   external: [
+  //     ...Object.keys(browserGlobals),
+  //   ],
+  //   plugins: [
+  //     nodeResolve({ browser: true }),
+  //     commonjs(),
+  //     filesize(),
+  //   ],
+  // },
+  // // build browser as IIFE module for script tag inclusion, minified
+  // // Usage:
+  // // <script src="../build/ros3d.min.js"></script>
+  // {
+  //   input,
+  //   output: {
+  //     name: 'ROS3D',
+  //     file: outputFiles.browserGlobalMinified,
+  //     format: 'iife',
+  //     globals: {
+  //       ...browserGlobals,
+  //     },
+  //   },
+  //   external: [
+  //     ...Object.keys(browserGlobals),
+  //   ],
+  //   plugins: [
+  //     nodeResolve({ browser: true }),
+  //     commonjs(),
+  //     filesize(),
+  //     terser(),
+  //   ],
+  // },
 ];

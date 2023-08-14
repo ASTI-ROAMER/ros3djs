@@ -16,24 +16,14 @@
 ROS3D.OccupancyGrid = function(options) {
   options = options || {};
   var message = options.message;
-  var opacity = options.opacity || 1.0;
+  var opacity = options.opacity || 0.7;
   var color = options.color || {r:255,g:255,b:255,a:255};
-  var transform = options.transform || this.defaultTransform;
+  var transform = options.transform || this.defaultTransform;   // Transforms cell (in grid) value to RGB
 
-  // create the geometry
-  var info = message.info;
-  var origin = info.origin;
-  var width = info.width;
-  var height = info.height;
-  var geom = new THREE.PlaneBufferGeometry(width, height);
-
-  // create the color material
-  var imageData = new Uint8Array(width * height * 4);
-  var texture = new THREE.DataTexture(imageData, width, height, THREE.RGBAFormat);
-  texture.flipY = true;
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  texture.needsUpdate = true;
+  // just create dummy
+  var geom = new THREE.PlaneBufferGeometry(1, 1);
+  var imageData = new Uint8Array(1 * 1 * 4);    // create 1x1 pixel image, dummy only
+  var texture = new THREE.DataTexture(imageData, 1, 1, THREE.RGBAFormat);
 
   var material = new THREE.MeshBasicMaterial({
     map : texture,
@@ -44,40 +34,133 @@ ROS3D.OccupancyGrid = function(options) {
 
   // create the mesh
   THREE.Mesh.call(this, geom, material);
-  // move the map so the corner is at X, Y and correct orientation (informations from message.info)
 
-  // assign options to this for subclasses
-  Object.assign(this, options);
+  // update the texture (after the the super call and this are accessible)
+  this.mapImageData = null;               // Edit this if you want the update has the same dimensions
+  this.mapOrigin = null;
+  this.mapWidth = null;
+  this.mapHeight = null;
 
-  this.quaternion.copy(new THREE.Quaternion(
+  this.color = color;
+  this.material = material;
+  this.texture = texture;
+  this.mapColorTransform = transform;     // Transforms cell (in grid) value to RGB
+
+  this.excludeFromHighlight = true;       // RANDEL: this will exclude this mesh from ROS3D.Highlighter
+
+  // update map from message
+  this.updateMap(message);
+
+};
+
+
+// Create update the texture and (geometry) of the grid from the msg
+// This will either create a new texture or update the existing texture
+// This is only for full map topics (nav_msgs/OccupancyGrid)
+ROS3D.OccupancyGrid.prototype.updateMap = function(message, transform=this.mapColorTransform){
+  var data = message.data;
+
+  // create the geometry
+  var info = message.info;
+  var origin = info.origin;
+  var width = info.width;
+  var height = info.height;
+  
+  if(this.isNewGridSameAsCur(origin, width, height)){
+    // console.log('FULL - SAME MAP UPDATE');
+    // if the new map has the same dimensions, just update its imageData
+    if(!this.mapImageData){
+      console.error('Expecting to have mapImageData since we are updating it, but it is empty');
+    }
+
+    this.buildImageData(this.mapImageData, data, this.mapWidth, this.mapHeight);
+    this.texture.needsUpdate = true;
+
+
+  } else {
+    // console.log('FULL - DIFFERENT MAP UPDATE');
+    // update texture and geometry if new map has different dimensions
+    // console.log('CREATE new texture for New map');
+
+    this.mapOrigin = origin;
+    this.mapWidth = width;
+    this.mapHeight = height;
+
+    this.texture.dispose();
+    // RANDEL: hard to update geometry, so just create a new geometry
+    var geom = new THREE.PlaneBufferGeometry(width, height);
+    this.geometry = geom;
+    this.quaternion.copy(new THREE.Quaternion(
       origin.orientation.x,
       origin.orientation.y,
       origin.orientation.z,
       origin.orientation.w
-  ));
-  this.position.x = (width * info.resolution) / 2 + origin.position.x;
-  this.position.y = (height * info.resolution) / 2 + origin.position.y;
-  this.position.z = origin.position.z;
-  this.scale.x = info.resolution;
-  this.scale.y = info.resolution;
+    ));
+    this.position.x = (width * info.resolution) / 2 + origin.position.x;
+    this.position.y = (height * info.resolution) / 2 + origin.position.y;
+    this.position.z = origin.position.z;
+    this.scale.x = info.resolution;
+    this.scale.y = info.resolution;
 
-  var data = message.data;
-  // update the texture (after the the super call and this are accessible)
-  this.color = color;
-  this.material = material;
-  this.texture = texture;
+    // create the color material
+    var imageData = new Uint8Array(width * height * 4);
+    this.buildImageData(imageData, data, this.mapWidth, this.mapHeight);
 
-  for ( var row = 0; row < height; row++) {
-    for ( var col = 0; col < width; col++) {
+    this.mapImageData = imageData;
+    // console.log(this.mapImageData);
 
-      // determine the index into the map data
-      var invRow = (height - row - 1);
-      var mapI = col + (invRow * width);
-      // determine the value
-      var val = this.transformMapData(this.getValue(mapI, invRow, col, data), transform);
+    var texture = new THREE.DataTexture(imageData, width, height, THREE.RGBAFormat);
+    // texture.flipY = true;
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
 
-      // determine the color
-      var color = this.getColor(mapI, invRow, col, val);
+    this.texture = texture;
+    this.material.map = texture;
+  }
+};
+
+// This is only for partial update map topics (map_msgs/OccupancyGridUpdate, topics with suffix of "_updates")
+ROS3D.OccupancyGrid.prototype.updatePartialMap = function(message, transform=this.mapColorTransform){
+  //https://docs.ros.org/en/jade/api/rviz/html/c++/map__display_8cpp_source.html#l00492
+  // Reject updates which have any out-of-bounds data.
+  if(message.x < 0 || message.y < 0 ||
+    this.mapWidth < message.x + message.width ||
+    this.mapHeight < message.y + message.height){
+      console.error('Update area outside of original map area.');
+      return;
+  }
+
+  if(!this.mapImageData){
+    console.error('Expecting to have mapImageData since we are updating it, but it is empty. Aborting update.');
+    return;
+  }
+
+  var height = message.height;
+  var width = message.width;
+  var ux = message.x;
+  var uy = message.y;
+
+  this.buildImageData(this.mapImageData, message.data, message.width, message.height, message.x, message.y);
+  this.texture.needsUpdate = true;
+
+
+};
+
+ROS3D.OccupancyGrid.prototype.buildImageData = function(imageData, data, width, height, x=0, y=0){
+  // THIS ASSUMES that the data from the update is WITHIN THE BOUND OF imageData!!!!
+  // Iterate over writable indeces of imageData, specified the starting positon (x,y) and the dimension of the data
+  // - row and col are in imageData coordinates
+  for ( var row = y; row < height+y; row++) {
+    for ( var col = x; col < width+x; col++) {
+      // Determine the index to be used for extractring values from data (data[0] corresponds to (x,y) data)
+      var dataRow = row - y;
+      var mapI = col + (dataRow * width);
+      // val is a grayscale value, converted from uint8data (data)
+      var val = this.transformMapData(this.getValue(mapI, dataRow, col, data), this.mapColorTransform);
+
+      // determine the color, color is an array of 4 values (RGBA)
+      var color = this.getColor(mapI, dataRow, col, val);
 
       // determine the index into the image data array
       var i = (col + (row * width)) * 4;
@@ -87,9 +170,26 @@ ROS3D.OccupancyGrid = function(options) {
     }
   }
 
-  texture.needsUpdate = true;
-
 };
+
+
+ROS3D.OccupancyGrid.prototype.isNewGridSameAsCur = function(origin, width, height){
+  if(this.mapOrigin !== null){
+    if(this.mapOrigin.position.x === origin.position.x && 
+        this.mapOrigin.position.y === origin.position.y &&
+        this.mapOrigin.position.z === origin.position.z &&
+        // this.mapOrigin.orientation.x === origin.orientation.x && 
+        // this.mapOrigin.orientation.y === origin.orientation.y && 
+        // this.mapOrigin.orientation.z === origin.orientation.z && 
+        // this.mapOrigin.orientation.w === origin.orientation.w && 
+        this.mapWidth === width && 
+        this.mapHeight === height){
+      return true;
+    }
+  } 
+  return false;
+};
+
 
 ROS3D.OccupancyGrid.prototype.dispose = function() {
   this.material.dispose();

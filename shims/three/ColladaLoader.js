@@ -29,7 +29,8 @@ THREE.ColladaLoader.prototype = {
 
     var scope = this;
 
-    var path = THREE.Loader.prototype.extractUrlBase(url);
+    // var path = THREE.Loader.prototype.extractUrlBase(url);
+    var path = THREE.LoaderUtils.extractUrlBase(url);
 
     var loader = new THREE.FileLoader(scope.manager);
     loader.load(url, function (text) {
@@ -3364,7 +3365,7 @@ THREE.ColladaLoader.prototype = {
 
     }
 
-    console.time('THREE.ColladaLoader');
+    // console.time('THREE.ColladaLoader');
 
     if (text.length === 0) {
 
@@ -3372,11 +3373,11 @@ THREE.ColladaLoader.prototype = {
 
     }
 
-    console.time('THREE.ColladaLoader: DOMParser');
+    // console.time('THREE.ColladaLoader: DOMParser');
 
     var xml = new DOMParser().parseFromString(text, 'application/xml');
 
-    console.timeEnd('THREE.ColladaLoader: DOMParser');
+    // console.timeEnd('THREE.ColladaLoader: DOMParser');
 
     var collada = getElementsByTagName(xml, 'COLLADA')[0];
 
@@ -3413,7 +3414,7 @@ THREE.ColladaLoader.prototype = {
       kinematicsScenes: {}
     };
 
-    console.time('THREE.ColladaLoader: Parse');
+    // console.time('THREE.ColladaLoader: Parse');
 
     parseLibrary(collada, 'library_animations', 'animation', parseAnimation);
     parseLibrary(collada, 'library_animation_clips', 'animation_clip', parseAnimationClip);
@@ -3429,9 +3430,9 @@ THREE.ColladaLoader.prototype = {
     parseLibrary(collada, 'library_kinematics_models', 'kinematics_model', parseKinematicsModel);
     parseLibrary(collada, 'scene', 'instance_kinematics_scene', parseKinematicsScene);
 
-    console.timeEnd('THREE.ColladaLoader: Parse');
+    // console.timeEnd('THREE.ColladaLoader: Parse');
 
-    console.time('THREE.ColladaLoader: Build');
+    // console.time('THREE.ColladaLoader: Build');
 
     buildLibrary(library.animations, buildAnimation);
     buildLibrary(library.clips, buildAnimationClip);
@@ -3444,7 +3445,7 @@ THREE.ColladaLoader.prototype = {
     buildLibrary(library.geometries, buildGeometry);
     buildLibrary(library.visualScenes, buildVisualScene);
 
-    console.timeEnd('THREE.ColladaLoader: Build');
+    // console.timeEnd('THREE.ColladaLoader: Build');
 
     setupAnimations();
     setupKinematics();
@@ -3464,7 +3465,7 @@ THREE.ColladaLoader.prototype = {
 
     scene.scale.multiplyScalar(asset.unit);
 
-    console.timeEnd('THREE.ColladaLoader');
+    // console.timeEnd('THREE.ColladaLoader');
 
     return {
       animations: animations,

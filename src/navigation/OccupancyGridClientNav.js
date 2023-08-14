@@ -80,63 +80,65 @@ ROS3D.OccupancyGridClientNav.prototype.setupNavigator = function(){
     // Add the navSceneNode to the viewer's scene (THREE.Scene)
     this.rootObject.add(this.navSceneNode);
   }
-}
+};
 
 
 // Override OccupancyGridClient.processMessage
 ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
-  // check for an old map
-  if (this.currentGrid) {
-    // check if it there is a tf client
+  if (this.currentGrid) {                       // current grid is not empty, so this is not the 1st run we process the msg
+    // console.log('FULL MAP UPDATE');
+    if(this.rosTopic.subscribeId){
+      this.currentGrid.updateMap(message);
+    }
+    
+  } else{                                       // we don't have a grid yet, this is our 1st run
+    console.log('INITIALIZING grid map');
+    // create a new grid, this new grid needs the navigator to delegete its event processing to the navigator.
+    var newGrid = new ROS3D.OccupancyGridNav({
+      message : message,
+      color : this.color,
+      opacity : this.opacity,
+      navigator: this.navigator,
+    });
+
+    // check if we care about the scene
     if (this.tfClient) {
-      // grid is of type ROS3D.SceneNode
-      this.sceneNode.unsubscribeTf();
-      this.sceneNode.remove(this.currentGrid);
-    } else {
-      this.rootObject.remove(this.currentGrid);
+      // console.log('have tf');
+      try{
+        this.currentGrid.dispose();
+      } catch(err) {
+        // pass
+      }
+      this.currentGrid = newGrid;
+      // Create a sceneNode container for our map if we don't have one yet (assume 1st run so we don't have it)
+      if (this.sceneNode === null) {            // create a sceneNode for the occupancyGrid if we dont have one yet
+        this.sceneNode = new ROS3D.SceneNode({
+          frameID : message.header.frame_id,
+          tfClient : this.tfClient,
+          object : newGrid,
+          pose : this.offsetPose
+        });
+        this.sceneNode.name = 'SceneNode_map';
+        this.rootObject.add(this.sceneNode);        // Add the sceneNode container of our map to the viewer's scene
+      } else {                                  // if we have a sceneNode
+        this.sceneNode.add(this.currentGrid);       // NOT SURE OF THIS ELSE BLOCK!!!
+      }
+    } else {                                        // NOT SURE OF THIS ELSE BLOCK!!!
+      this.sceneNode = this.currentGrid = newGrid;
+      this.rootObject.add(this.currentGrid);
     }
-    this.currentGrid.dispose();
-  }
 
-  var newGrid = new ROS3D.OccupancyGridNav({
-    message : message,
-    color : this.color,
-    opacity : this.opacity,
-    navigator: this.navigator,
-  });
-
-  // check if we care about the scene
-  if (this.tfClient) {
-    this.currentGrid = newGrid;
-    if (this.sceneNode === null) {
-      this.sceneNode = new ROS3D.SceneNode({
-        frameID : message.header.frame_id,
-        tfClient : this.tfClient,
-        object : newGrid,
-        pose : this.offsetPose
-      });
-      this.sceneNode.name = 'SceneNode_map';
-      // this.sceneNode.add(this.navigator);
-      this.rootObject.add(this.sceneNode);
-    } else {
-      this.sceneNode.add(this.currentGrid);
-      // this.sceneNode.add(this.navigator);
+    if (this.viewer){
+      // add sceneNode to viewer.selectableObjects
+      this.viewer.addObject(this.sceneNode, true);
     }
-  } else {
-    this.sceneNode = this.currentGrid = newGrid;
-    this.rootObject.add(this.currentGrid);
-    // this.rootObject.add(this.navigator);
-  }
-
-  if (this.viewer){
-    // add sceneNode to viewer.selectableObjects
-    this.viewer.addObject(this.sceneNode, true);
   }
 
   this.emit('change');
 
   // check if we should unsubscribe
   if (!this.continuous) {
-    this.rosTopic.unsubscribe(this.processMessage);
+    // this.rosTopic.unsubscribe(this.processMessage);
+    this.unsubscribe();
   }
 };

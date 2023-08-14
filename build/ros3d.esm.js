@@ -54427,7 +54427,8 @@ THREE.ColladaLoader.prototype = {
 
     var scope = this;
 
-    var path = THREE.Loader.prototype.extractUrlBase(url);
+    // var path = THREE.Loader.prototype.extractUrlBase(url);
+    var path = THREE.LoaderUtils.extractUrlBase(url);
 
     var loader = new THREE.FileLoader(scope.manager);
     loader.load(url, function (text) {
@@ -57747,7 +57748,7 @@ THREE.ColladaLoader.prototype = {
 
     }
 
-    console.time('THREE.ColladaLoader');
+    // console.time('THREE.ColladaLoader');
 
     if (text.length === 0) {
 
@@ -57755,11 +57756,11 @@ THREE.ColladaLoader.prototype = {
 
     }
 
-    console.time('THREE.ColladaLoader: DOMParser');
+    // console.time('THREE.ColladaLoader: DOMParser');
 
     var xml = new DOMParser().parseFromString(text, 'application/xml');
 
-    console.timeEnd('THREE.ColladaLoader: DOMParser');
+    // console.timeEnd('THREE.ColladaLoader: DOMParser');
 
     var collada = getElementsByTagName(xml, 'COLLADA')[0];
 
@@ -57796,7 +57797,7 @@ THREE.ColladaLoader.prototype = {
       kinematicsScenes: {}
     };
 
-    console.time('THREE.ColladaLoader: Parse');
+    // console.time('THREE.ColladaLoader: Parse');
 
     parseLibrary(collada, 'library_animations', 'animation', parseAnimation);
     parseLibrary(collada, 'library_animation_clips', 'animation_clip', parseAnimationClip);
@@ -57812,9 +57813,9 @@ THREE.ColladaLoader.prototype = {
     parseLibrary(collada, 'library_kinematics_models', 'kinematics_model', parseKinematicsModel);
     parseLibrary(collada, 'scene', 'instance_kinematics_scene', parseKinematicsScene);
 
-    console.timeEnd('THREE.ColladaLoader: Parse');
+    // console.timeEnd('THREE.ColladaLoader: Parse');
 
-    console.time('THREE.ColladaLoader: Build');
+    // console.time('THREE.ColladaLoader: Build');
 
     buildLibrary(library.animations, buildAnimation);
     buildLibrary(library.clips, buildAnimationClip);
@@ -57827,7 +57828,7 @@ THREE.ColladaLoader.prototype = {
     buildLibrary(library.geometries, buildGeometry);
     buildLibrary(library.visualScenes, buildVisualScene);
 
-    console.timeEnd('THREE.ColladaLoader: Build');
+    // console.timeEnd('THREE.ColladaLoader: Build');
 
     setupAnimations();
     setupKinematics();
@@ -57847,7 +57848,7 @@ THREE.ColladaLoader.prototype = {
 
     scene.scale.multiplyScalar(asset.unit);
 
-    console.timeEnd('THREE.ColladaLoader');
+    // console.timeEnd('THREE.ColladaLoader');
 
     return {
       animations: animations,
@@ -62038,262 +62039,6 @@ var Grid = /*@__PURE__*/(function (superclass) {
 
 /**
  * @fileOverview
- * @author Russell Toris - rctoris@wpi.edu
- */
-
-var OccupancyGrid = /*@__PURE__*/(function (superclass) {
-  function OccupancyGrid(options) {
-    options = options || {};
-    var message = options.message;
-    var opacity = options.opacity || 1.0;
-    var color = options.color || {r:255,g:255,b:255,a:255};
-    var transform = options.transform || this.defaultTransform;
-
-    // create the geometry
-    var info = message.info;
-    var origin = info.origin;
-    var width = info.width;
-    var height = info.height;
-    var geom = new THREE.PlaneBufferGeometry(width, height);
-
-    // create the color material
-    var imageData = new Uint8Array(width * height * 4);
-    var texture = new THREE.DataTexture(imageData, width, height, THREE.RGBAFormat);
-    texture.flipY = true;
-    texture.minFilter = THREE.NearestFilter;
-    texture.magFilter = THREE.NearestFilter;
-    texture.needsUpdate = true;
-
-    var material = new THREE.MeshBasicMaterial({
-      map : texture,
-      transparent : opacity < 1.0,
-      opacity : opacity
-    });
-    material.side = THREE.DoubleSide;
-
-    // create the mesh
-    superclass.call(this, geom, material);
-    // move the map so the corner is at X, Y and correct orientation (informations from message.info)
-
-    // assign options to this for subclasses
-    Object.assign(this, options);
-
-    this.quaternion.copy(new THREE.Quaternion(
-        origin.orientation.x,
-        origin.orientation.y,
-        origin.orientation.z,
-        origin.orientation.w
-    ));
-    this.position.x = (width * info.resolution) / 2 + origin.position.x;
-    this.position.y = (height * info.resolution) / 2 + origin.position.y;
-    this.position.z = origin.position.z;
-    this.scale.x = info.resolution;
-    this.scale.y = info.resolution;
-
-    var data = message.data;
-    // update the texture (after the the super call and this are accessible)
-    this.color = color;
-    this.material = material;
-    this.texture = texture;
-
-    for ( var row = 0; row < height; row++) {
-      for ( var col = 0; col < width; col++) {
-
-        // determine the index into the map data
-        var invRow = (height - row - 1);
-        var mapI = col + (invRow * width);
-        // determine the value
-        var val = this.transformMapData(this.getValue(mapI, invRow, col, data), transform);
-
-        // determine the color
-        var color = this.getColor(mapI, invRow, col, val);
-
-        // determine the index into the image data array
-        var i = (col + (row * width)) * 4;
-
-        // copy the color
-        imageData.set(color, i);
-      }
-    }
-
-    texture.needsUpdate = true;
-
-  }
-
-  if ( superclass ) OccupancyGrid.__proto__ = superclass;
-  OccupancyGrid.prototype = Object.create( superclass && superclass.prototype );
-  OccupancyGrid.prototype.constructor = OccupancyGrid;
-  OccupancyGrid.prototype.dispose = function dispose () {
-    this.material.dispose();
-    this.texture.dispose();
-  };
-  /**
-   * Returns the value for a given grid cell
-   * @param {int} index the current index of the cell
-   * @param {int} row the row of the cell
-   * @param {int} col the column of the cell
-   * @param {object} data the data buffer
-   */
-  OccupancyGrid.prototype.getValue = function getValue (index, row, col, data) {
-    return data[index];
-  };
-  /**
-   * Returns a color value given parameters of the position in the grid; the default implementation
-   * scales the default color value by the grid value. Subclasses can extend this functionality
-   * (e.g. lookup a color in a color map).
-   * @param {int} index the current index of the cell
-   * @param {int} row the row of the cell
-   * @param {int} col the column of the cell
-   * @param {float} value the value of the cell
-   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
-   */
-  OccupancyGrid.prototype.getColor = function getColor (index, row, col, value) {
-    return [
-      (value * this.color.r) / 255,
-      (value * this.color.g) / 255,
-      (value * this.color.b) / 255,
-      255
-    ];
-  };
-
-  /**
-   * RANDEL!!!
-   * Transforms Occupancy map value [0, 100], to a grayscale map by using the transform <transform>.
-   * @param {int} value occupancy value
-   * @param {function} transform the function used for transformation
-   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
-   */
-   OccupancyGrid.prototype.transformMapData = function transformMapData (value, transform) {
-    if ( transform === void 0 ) transform=this.defaultTransform;
-
-    return transform(value);
-  };
-  /**
-   * RANDEL!!!
-   * This is the legacy transform.
-   * Transforms occupancy value to a grayscale value.
-   * A value of 100 (100% occupied) is black, a value of 0 (certainly UNoccupied) is white.
-   * Other values are set to 127 (gray).
-   * @param {int} value the value of the cell. Value should be [0, 100]
-   * @returns grayscale value from 0 to 255 representing the occupancy value.
-   */
-   OccupancyGrid.prototype.defaultTransform = function defaultTransform (value) {
-    var val_trans = value;
-    if (value === 100) {
-      val_trans = 0;
-    } else if (value === 0) {
-      val_trans = 255;
-    } else {
-      val_trans = 127;
-    }
-    
-    return val_trans;
-  };
-
-  return OccupancyGrid;
-}(THREE.Mesh));
-
-/**
- * @fileOverview
- * @author Russell Toris - rctoris@wpi.edu
- */
-
-var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
-  function OccupancyGridClient(options) {
-    EventEmitter2.call(this);
-    options = options || {};
-    this.ros = options.ros;
-    this.topicName = options.topic || '/map';
-    this.compression = options.compression || 'cbor';
-    this.continuous = options.continuous;
-    this.tfClient = options.tfClient;
-    this.rootObject = options.rootObject || new THREE.Object3D();
-    this.offsetPose = options.offsetPose || new ROSLIB.Pose();
-    this.color = options.color || {r:255,g:255,b:255};
-    this.opacity = options.opacity || 1.0;
-
-    // current grid that is displayed
-    this.currentGrid = null;
-
-    // subscribe to the topic
-    this.rosTopic = undefined;
-    this.subscribe();
-  }
-
-  if ( EventEmitter2 ) OccupancyGridClient.__proto__ = EventEmitter2;
-  OccupancyGridClient.prototype = Object.create( EventEmitter2 && EventEmitter2.prototype );
-  OccupancyGridClient.prototype.constructor = OccupancyGridClient;
-  OccupancyGridClient.prototype.unsubscribe = function unsubscribe (){
-    if(this.rosTopic){
-      this.rosTopic.unsubscribe(this.processMessage);
-    }
-  };
-  OccupancyGridClient.prototype.subscribe = function subscribe (){
-    this.unsubscribe();
-
-    // subscribe to the topic
-    this.rosTopic = new ROSLIB.Topic({
-      ros : this.ros,
-      name : this.topicName,
-      messageType : 'nav_msgs/OccupancyGrid',
-      queue_length : 1,
-      compression : this.compression
-    });
-    this.sceneNode = null;
-    this.rosTopic.subscribe(this.processMessage.bind(this));
-  };
-  OccupancyGridClient.prototype.processMessage = function processMessage (message){
-    // check for an old map
-    if (this.currentGrid) {
-      // check if it there is a tf client
-      if (this.tfClient) {
-        // grid is of type ROS3D.SceneNode
-        this.sceneNode.unsubscribeTf();
-        this.sceneNode.remove(this.currentGrid);
-      } else {
-        this.rootObject.remove(this.currentGrid);
-      }
-      this.currentGrid.dispose();
-    }
-
-    var newGrid = new OccupancyGrid({
-      message : message,
-      color : this.color,
-      opacity : this.opacity
-    });
-
-    // check if we care about the scene
-    if (this.tfClient) {
-      this.currentGrid = newGrid;
-      if (this.sceneNode === null) {
-        this.sceneNode = new SceneNode({
-          frameID : message.header.frame_id,
-          tfClient : this.tfClient,
-          object : newGrid,
-          pose : this.offsetPose
-        });
-        this.rootObject.add(this.sceneNode);
-      } else {
-        this.sceneNode.add(this.currentGrid);
-      }
-    } else {
-      this.sceneNode = this.currentGrid = newGrid;
-      this.rootObject.add(this.currentGrid);
-    }
-
-    this.emit('change');
-
-    // check if we should unsubscribe
-    if (!this.continuous) {
-      this.rosTopic.unsubscribe(this.processMessage);
-    }
-  };
-
-  return OccupancyGridClient;
-}(EventEmitter2));
-
-/**
- * @fileOverview
  * @author David Gossow - dgossow@willowgarage.com
  */
 
@@ -62419,6 +62164,460 @@ Highlighter.prototype.restoreVisibility = function restoreVisibility (scene) {
     }
   }.bind(this));
 };
+
+/**
+ * @fileOverview
+ * @author Russell Toris - rctoris@wpi.edu
+ */
+
+var OccupancyGrid = /*@__PURE__*/(function (superclass) {
+  function OccupancyGrid(options) {
+    options = options || {};
+    var message = options.message;
+    var opacity = options.opacity || 0.7;
+    var color = options.color || {r:255,g:255,b:255,a:255};
+    var transform = options.transform || this.defaultTransform;   // Transforms cell (in grid) value to RGB
+
+    // just create dummy
+    var geom = new THREE.PlaneBufferGeometry(1, 1);
+    var imageData = new Uint8Array(1 * 1 * 4);    // create 1x1 pixel image, dummy only
+    var texture = new THREE.DataTexture(imageData, 1, 1, THREE.RGBAFormat);
+
+    var material = new THREE.MeshBasicMaterial({
+      map : texture,
+      transparent : opacity < 1.0,
+      opacity : opacity
+    });
+    material.side = THREE.DoubleSide;
+
+    // create the mesh
+    superclass.call(this, geom, material);
+
+    // update the texture (after the the super call and this are accessible)
+    this.mapImageData = null;               // Edit this if you want the update has the same dimensions
+    this.mapOrigin = null;
+    this.mapWidth = null;
+    this.mapHeight = null;
+
+    this.color = color;
+    this.material = material;
+    this.texture = texture;
+    this.mapColorTransform = transform;     // Transforms cell (in grid) value to RGB
+
+    this.excludeFromHighlight = true;       // RANDEL: this will exclude this mesh from Highlighter
+
+    // update map from message
+    this.updateMap(message);
+
+  }
+
+  if ( superclass ) OccupancyGrid.__proto__ = superclass;
+  OccupancyGrid.prototype = Object.create( superclass && superclass.prototype );
+  OccupancyGrid.prototype.constructor = OccupancyGrid;
+
+  // Create update the texture and (geometry) of the grid from the msg
+  // This will either create a new texture or update the existing texture
+  // This is only for full map topics (nav_msgs/OccupancyGrid)
+  OccupancyGrid.prototype.updateMap = function updateMap (message, transform){
+    if ( transform === void 0 ) transform=this.mapColorTransform;
+
+    var data = message.data;
+
+    // create the geometry
+    var info = message.info;
+    var origin = info.origin;
+    var width = info.width;
+    var height = info.height;
+    
+    if(this.isNewGridSameAsCur(origin, width, height)){
+      // console.log('FULL - SAME MAP UPDATE');
+      // if the new map has the same dimensions, just update its imageData
+      if(!this.mapImageData){
+        console.error('Expecting to have mapImageData since we are updating it, but it is empty');
+      }
+
+      this.buildImageData(this.mapImageData, data, this.mapWidth, this.mapHeight);
+      this.texture.needsUpdate = true;
+
+
+    } else {
+      // console.log('FULL - DIFFERENT MAP UPDATE');
+      // update texture and geometry if new map has different dimensions
+      // console.log('CREATE new texture for New map');
+
+      this.mapOrigin = origin;
+      this.mapWidth = width;
+      this.mapHeight = height;
+
+      this.texture.dispose();
+      // RANDEL: hard to update geometry, so just create a new geometry
+      var geom = new THREE.PlaneBufferGeometry(width, height);
+      this.geometry = geom;
+      this.quaternion.copy(new THREE.Quaternion(
+        origin.orientation.x,
+        origin.orientation.y,
+        origin.orientation.z,
+        origin.orientation.w
+      ));
+      this.position.x = (width * info.resolution) / 2 + origin.position.x;
+      this.position.y = (height * info.resolution) / 2 + origin.position.y;
+      this.position.z = origin.position.z;
+      this.scale.x = info.resolution;
+      this.scale.y = info.resolution;
+
+      // create the color material
+      var imageData = new Uint8Array(width * height * 4);
+      this.buildImageData(imageData, data, this.mapWidth, this.mapHeight);
+
+      this.mapImageData = imageData;
+      // console.log(this.mapImageData);
+
+      var texture = new THREE.DataTexture(imageData, width, height, THREE.RGBAFormat);
+      // texture.flipY = true;
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
+      texture.needsUpdate = true;
+
+      this.texture = texture;
+      this.material.map = texture;
+    }
+  };
+  // This is only for partial update map topics (map_msgs/OccupancyGridUpdate, topics with suffix of "_updates")
+  OccupancyGrid.prototype.updatePartialMap = function updatePartialMap (message, transform){
+    if ( transform === void 0 ) transform=this.mapColorTransform;
+
+    //https://docs.ros.org/en/jade/api/rviz/html/c++/map__display_8cpp_source.html#l00492
+    // Reject updates which have any out-of-bounds data.
+    if(message.x < 0 || message.y < 0 ||
+      this.mapWidth < message.x + message.width ||
+      this.mapHeight < message.y + message.height){
+        console.error('Update area outside of original map area.');
+        return;
+    }
+
+    if(!this.mapImageData){
+      console.error('Expecting to have mapImageData since we are updating it, but it is empty. Aborting update.');
+      return;
+    }
+
+    message.height;
+    message.width;
+    message.x;
+    message.y;
+
+    this.buildImageData(this.mapImageData, message.data, message.width, message.height, message.x, message.y);
+    this.texture.needsUpdate = true;
+
+
+  };
+  OccupancyGrid.prototype.buildImageData = function buildImageData (imageData, data, width, height, x, y){
+    if ( x === void 0 ) x=0;
+    if ( y === void 0 ) y=0;
+
+    // THIS ASSUMES that the data from the update is WITHIN THE BOUND OF imageData!!!!
+    // Iterate over writable indeces of imageData, specified the starting positon (x,y) and the dimension of the data
+    // - row and col are in imageData coordinates
+    for ( var row = y; row < height+y; row++) {
+      for ( var col = x; col < width+x; col++) {
+        // Determine the index to be used for extractring values from data (data[0] corresponds to (x,y) data)
+        var dataRow = row - y;
+        var mapI = col + (dataRow * width);
+        // val is a grayscale value, converted from uint8data (data)
+        var val = this.transformMapData(this.getValue(mapI, dataRow, col, data), this.mapColorTransform);
+
+        // determine the color, color is an array of 4 values (RGBA)
+        var color = this.getColor(mapI, dataRow, col, val);
+
+        // determine the index into the image data array
+        var i = (col + (row * width)) * 4;
+
+        // copy the color
+        imageData.set(color, i);
+      }
+    }
+
+  };
+
+  OccupancyGrid.prototype.isNewGridSameAsCur = function isNewGridSameAsCur (origin, width, height){
+    if(this.mapOrigin !== null){
+      if(this.mapOrigin.position.x === origin.position.x && 
+          this.mapOrigin.position.y === origin.position.y &&
+          this.mapOrigin.position.z === origin.position.z &&
+          // this.mapOrigin.orientation.x === origin.orientation.x && 
+          // this.mapOrigin.orientation.y === origin.orientation.y && 
+          // this.mapOrigin.orientation.z === origin.orientation.z && 
+          // this.mapOrigin.orientation.w === origin.orientation.w && 
+          this.mapWidth === width && 
+          this.mapHeight === height){
+        return true;
+      }
+    } 
+    return false;
+  };
+
+  OccupancyGrid.prototype.dispose = function dispose () {
+    this.material.dispose();
+    this.texture.dispose();
+  };
+  /**
+   * Returns the value for a given grid cell
+   * @param {int} index the current index of the cell
+   * @param {int} row the row of the cell
+   * @param {int} col the column of the cell
+   * @param {object} data the data buffer
+   */
+  OccupancyGrid.prototype.getValue = function getValue (index, row, col, data) {
+    return data[index];
+  };
+  /**
+   * Returns a color value given parameters of the position in the grid; the default implementation
+   * scales the default color value by the grid value. Subclasses can extend this functionality
+   * (e.g. lookup a color in a color map).
+   * @param {int} index the current index of the cell
+   * @param {int} row the row of the cell
+   * @param {int} col the column of the cell
+   * @param {float} value the value of the cell
+   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
+   */
+  OccupancyGrid.prototype.getColor = function getColor (index, row, col, value) {
+    return [
+      (value * this.color.r) / 255,
+      (value * this.color.g) / 255,
+      (value * this.color.b) / 255,
+      255
+    ];
+  };
+
+  /**
+   * RANDEL!!!
+   * Transforms Occupancy map value [0, 100], to a grayscale map by using the transform <transform>.
+   * @param {int} value occupancy value
+   * @param {function} transform the function used for transformation
+   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
+   */
+   OccupancyGrid.prototype.transformMapData = function transformMapData (value, transform) {
+    if ( transform === void 0 ) transform=this.defaultTransform;
+
+    return transform(value);
+  };
+  /**
+   * RANDEL!!!
+   * This is the legacy transform.
+   * Transforms occupancy value to a grayscale value.
+   * A value of 100 (100% occupied) is black, a value of 0 (certainly UNoccupied) is white.
+   * Other values are set to 127 (gray).
+   * @param {int} value the value of the cell. Value should be [0, 100]
+   * @returns grayscale value from 0 to 255 representing the occupancy value.
+   */
+   OccupancyGrid.prototype.defaultTransform = function defaultTransform (value) {
+    var val_trans = value;
+    if (value === 100) {
+      val_trans = 0;
+    } else if (value === 0) {
+      val_trans = 255;
+    } else {
+      val_trans = 127;
+    }
+    
+    return val_trans;
+  };
+
+  return OccupancyGrid;
+}(THREE.Mesh));
+
+/**
+ * @fileOverview
+ * @author Russell Toris - rctoris@wpi.edu
+ */
+
+var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
+  function OccupancyGridClient(options) {
+    EventEmitter2.call(this);
+    options = options || {};
+    this.ros = options.ros;
+    this.topicName = options.topic || '/map';
+    this.compression = options.compression || 'cbor';
+    this.continuous = options.continuous;
+    this.tfClient = options.tfClient;
+    this.rootObject = options.rootObject || new THREE.Object3D();
+    this.offsetPose = options.offsetPose || new ROSLIB.Pose();
+    this.color = options.color || {r:255,g:255,b:255};
+    this.opacity = options.opacity || 0.7;
+    this.throttle_rate = options.throttle_rate || 0;
+
+    // current grid that is displayed
+    this.currentGrid = null;
+
+    // subscribe to the topic
+    this.rosTopic = undefined;
+    this.rosTopic_mapPartialUpdate = undefined;
+    this.subscribe();
+  }
+
+  if ( EventEmitter2 ) OccupancyGridClient.__proto__ = EventEmitter2;
+  OccupancyGridClient.prototype = Object.create( EventEmitter2 && EventEmitter2.prototype );
+  OccupancyGridClient.prototype.constructor = OccupancyGridClient;
+  OccupancyGridClient.prototype.unsubscribe = function unsubscribe (){
+    // console.log('UNSUBSCRIBE');
+    if(this.rosTopic){
+      console.log('MAIN map unsubs');
+      this.rosTopic.unsubscribe();
+    }
+
+    if(this.rosTopic_mapPartialUpdate){
+      console.log('PARTIAL map unsubs');
+      this.rosTopic_mapPartialUpdate.unsubscribe();
+    }
+
+    // console.log('END___UNSUBSCRIBE');
+  };
+  OccupancyGridClient.prototype.subscribe = function subscribe (){
+    this.unsubscribe();
+
+    // subscribe to the topic
+    this.rosTopic = new ROSLIB.Topic({
+      ros : this.ros,
+      name : this.topicName,
+      messageType : 'nav_msgs/OccupancyGrid',
+      queue_length : 1,
+      compression : this.compression,
+      throttle_rate: this.throttle_rate,
+    });
+    console.log('Subscribing to: ' + this.topicName);
+    this.rosTopic.subscribe(this.processMessage.bind(this));
+
+    if(this.continuous){
+      this.rosTopic_mapPartialUpdate = new ROSLIB.Topic({
+        ros : this.ros,
+        name : this.topicName + '_updates',
+        messageType : 'map_msgs/OccupancyGridUpdate',
+        queue_length : 1,
+        compression : this.compression,
+        throttle_rate: this.throttle_rate,
+      });
+      console.log('Subscribing to: ' + this.topicName + '_updates');
+      this.rosTopic_mapPartialUpdate.subscribe(this.processMessage_mapPartialUpdate.bind(this));
+    }
+
+    this.sceneNode = null;
+    
+    
+  };
+  // processMessage(message){
+  //   // check for an old map
+  //   if (this.currentGrid) {
+  //     // check if it there is a tf client
+  //     if (this.tfClient) {
+  //       // grid is of type ROS3D.SceneNode
+  //       this.sceneNode.unsubscribeTf();
+  //       this.sceneNode.remove(this.currentGrid);
+  //     } else {
+  //       this.rootObject.remove(this.currentGrid);
+  //     }
+  //     this.currentGrid.dispose();
+  //   }
+
+  //   var newGrid = new ROS3D.OccupancyGrid({
+  //     message : message,
+  //     color : this.color,
+  //     opacity : this.opacity
+  //   });
+
+  //   // check if we care about the scene
+  //   if (this.tfClient) {
+  //     this.currentGrid = newGrid;
+  //     if (this.sceneNode === null) {
+  //       this.sceneNode = new ROS3D.SceneNode({
+  //         frameID : message.header.frame_id,
+  //         tfClient : this.tfClient,
+  //         object : newGrid,
+  //         pose : this.offsetPose
+  //       });
+  //       this.rootObject.add(this.sceneNode);
+  //     } else {
+  //       this.sceneNode.add(this.currentGrid);
+  //     }
+  //   } else {
+  //     this.sceneNode = this.currentGrid = newGrid;
+  //     this.rootObject.add(this.currentGrid);
+  //   }
+
+  //   this.emit('change');
+
+  //   // check if we should unsubscribe
+  //   if (!this.continuous) {
+  //     this.unsubscribe();
+  //   }
+  // };
+
+
+  OccupancyGridClient.prototype.processMessage = function processMessage (message){
+    if (this.currentGrid) {                       // current grid is not empty, so this is not the 1st run we process the msg
+      // console.log('FULL MAP UPDATE');
+      if(this.rosTopic.subscribeId){
+        this.currentGrid.updateMap(message);
+      }
+      
+    } else {                                       // we don't have a grid yet, this is our 1st run
+      console.log('INITIALIZING grid map');
+      // create a new grid, this new grid needs the navigator to delegete its event processing to the navigator.
+      var newGrid = new OccupancyGrid({
+        message : message,
+        color : this.color,
+        opacity : this.opacity,
+      });
+
+      // check if we care about the scene
+      if (this.tfClient) {
+        // console.log('have tf');
+        try{
+          this.currentGrid.dispose();
+        } catch(err) {
+          // pass
+        }
+        this.currentGrid = newGrid;
+        // Create a sceneNode container for our map if we don't have one yet (assume 1st run so we don't have it)
+        if (this.sceneNode === null) {            // create a sceneNode for the occupancyGrid if we dont have one yet
+          this.sceneNode = new SceneNode({
+            frameID : message.header.frame_id,
+            tfClient : this.tfClient,
+            object : newGrid,
+            pose : this.offsetPose
+          });
+          this.sceneNode.name = 'SceneNode_map';
+          this.rootObject.add(this.sceneNode);        // Add the sceneNode container of our map to the viewer's scene
+        } else {                                  // if we have a sceneNode
+          this.sceneNode.add(this.currentGrid);       // NOT SURE OF THIS ELSE BLOCK!!!
+        }
+      } else {                                        // NOT SURE OF THIS ELSE BLOCK!!!
+        this.sceneNode = this.currentGrid = newGrid;
+        this.rootObject.add(this.currentGrid);
+      }
+
+      if (this.viewer){
+        // add sceneNode to viewer.selectableObjects
+        this.viewer.addObject(this.sceneNode, true);
+      }
+    }
+
+    this.emit('change');
+
+    // check if we should unsubscribe
+    if (!this.continuous) {
+      // this.rosTopic.unsubscribe(this.processMessage);
+      this.unsubscribe();
+    }
+  };
+
+  OccupancyGridClient.prototype.processMessage_mapPartialUpdate = function processMessage_mapPartialUpdate (message){
+    // console.log('PARTIAL map update');
+    if(this.currentGrid){
+      this.currentGrid.updatePartialMap(message);
+    }
+  };
+
+  return OccupancyGridClient;
+}(EventEmitter2));
 
 /**
  * @fileOverview
@@ -62670,7 +62869,7 @@ var OccupancyGridNav = /*@__PURE__*/(function (OccupancyGrid) {
     OccupancyGrid.call(this, options);
     // var message = options.message;              // the ros OccupancyGrid message that we need to construct the mesh
     this.navigator = options.navigator || null;
-    this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from Highlighter
+    // this.excludeFromHighlight = true;           // RANDEL: this will exclude this mesh from ROS3D.Highlighter
 
 
     var eventNames = [ 'contextmenu', 'click', 'dblclick', 'mouseout', 'mousedown', 'mouseup',
@@ -62751,7 +62950,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
             return function () {
               var ref;
 
-              var args = Array.from(arguments); 
+              var args = Array.from(arguments);
               console.log('===' + prop);
               console.log('Args: [' + args + ']');
 
@@ -62910,7 +63109,7 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                   that.rootObject.emit('navigationUpd');
               }
               return Array.prototype[prop].apply(target, arguments);      // This line (the apply) mutates the goalList
-            }
+            };
           }
           return val.bind(target);
         }
@@ -62990,7 +63189,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     return tempMarker;
     // this.latestMarker = tempMarker;             // just so we know what the last marker was for easy access
   };
-
   // Applies an orientation (quaternion) as a direction to the latest marker or the given marker
   Navigator_MW.prototype.updateMarkerOri = function updateMarkerOri (ori, marker, c){
     if ( marker === void 0 ) marker=this.latestMarker;
@@ -63005,7 +63203,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
       this.rootObject.emit('change');
     }
   };
-
 
   Navigator_MW.prototype.addConnectorMarker = function addConnectorMarker (newPos, oldPos,  c){
     if ( c === void 0 ) c=this.color;
@@ -63034,7 +63231,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     this.clear();   // remember, Navigator is a THREE.Object3D, clearing its children will remove any markers
   };
 
-
   // RANDEL: Re-constructs all markers of all the waypoints.  ***UNUSED/REDUNDANT*****
   Navigator_MW.prototype.updateAllMarkers = function updateAllMarkers (){
     // Temporarily store goalList
@@ -63052,13 +63248,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     this.goalList.push(pose);             // Mutating the PROXY goalList should emit a signal
     // this.rootObject.emit('navigationUpd');
   };
-
   //Mitz - delete pose on array
   Navigator_MW.prototype.deletePose = function deletePose (index_no){
     this.goalList.splice(index_no, 1);
     // this.rootObject.emit('navigationUpd');
   };
-
   // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
   Navigator_MW.prototype.calculateOrientation = function calculateOrientation (p1, p2){
     if ( p1 === void 0 || p2 === void 0) {
@@ -63088,13 +63282,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
   };
 
-
   Navigator_MW.prototype.clearGoalList = function clearGoalList (){
     this.goalList.splice(0, this.goalList.length);
     // this.rootObject.emit('navigationUpd');
     // this.clear();         // clears markers
   };
-
 
   Navigator_MW.prototype.mouseEventHandlerUnbound = function mouseEventHandlerUnbound (event3D){
     // only handle mouse events when active
@@ -63202,7 +63394,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
       }
     } 
   };
-
   Navigator_MW.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
     // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
     // but we need the mouse UP position
@@ -63226,7 +63417,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     
   };
 
-
   Navigator_MW.prototype.highlightNodeAtIndex = function highlightNodeAtIndex (index){
     var nodeMarkerObj = this.nodeMarkerList[index];
     if(nodeMarkerObj){
@@ -63238,7 +63428,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     }
   };
 
-
   Navigator_MW.prototype.unhighlightNodeAtIndex = function unhighlightNodeAtIndex (index){
     var nodeMarkerObj = this.nodeMarkerList[index];
     if(nodeMarkerObj){
@@ -63249,7 +63438,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
       } catch(err){}
     }
   };
-
   Navigator_MW.prototype.unhighlightAllNodes = function unhighlightAllNodes (){
     var this$1$1 = this;
 
@@ -63261,7 +63449,6 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     });
     this.rootObject.emit('change');
   };
-
 
   Navigator_MW.prototype.moveNodeFromIndexTo = function moveNodeFromIndexTo (fromIndex, toIndex, count){
     var ref;
@@ -63278,17 +63465,14 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     }
   };
 
-
   Navigator_MW.prototype.activate = function activate (event3D){
     this.isActive = true;
     
   };
-
   Navigator_MW.prototype.deactivate = function deactivate (event3D){
     this.isActive = false;
     // this.clearGoalList();       // REMOVE THISSSSS, FOR DEBUGGING ONLY
   };
-
   Navigator_MW.prototype.toggleActivation = function toggleActivation (event3D){
     this.isActive = !this.isActive;
 
@@ -63407,7 +63591,6 @@ var Navigator = /*@__PURE__*/(function (superclass) {
     this.rootObject.emit('change');
   };
 
-
   // calculate ORIENTATION between (ROSLIB.Vector3) point1 and point2
   Navigator.prototype.calculateOrientation = function calculateOrientation (p1, p2){
     var xDelta = p2.x - p1.x;
@@ -63433,7 +63616,6 @@ var Navigator = /*@__PURE__*/(function (superclass) {
 
     return (new ROSLIB.Quaternion({x:0, y:0, z:qz, w:qw}));
   };
-
 
   Navigator.prototype.mouseEventHandlerUnbound = function mouseEventHandlerUnbound (event3D){
     // only handle mouse events when active
@@ -63531,7 +63713,6 @@ var Navigator = /*@__PURE__*/(function (superclass) {
       }
     } 
   };
-
   Navigator.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
     // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
     // but we need the mouse UP position
@@ -63550,18 +63731,15 @@ var Navigator = /*@__PURE__*/(function (superclass) {
     } else {
       poi = event3D.intersection.point;       // revert to mouse down POI if it fails
     }
-    return poi
+    return poi;
   };
-
 
   Navigator.prototype.activate = function activate (event3D){
     this.isActive = true;
   };
-
   Navigator.prototype.deactivate = function deactivate (event3D){
     this.isActive = false;
   };
-
   Navigator.prototype.toggleActivation = function toggleActivation (event3D){
     this.isActive = !this.isActive;
     console.log('Navigator isActive: ' + this.isActive);
@@ -63630,62 +63808,63 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
     }
   };
 
-
   // Override OccupancyGridClient.processMessage
   OccupancyGridClientNav.prototype.processMessage = function processMessage (message){
-    // check for an old map
-    if (this.currentGrid) {
-      // check if it there is a tf client
+    if (this.currentGrid) {                       // current grid is not empty, so this is not the 1st run we process the msg
+      // console.log('FULL MAP UPDATE');
+      if(this.rosTopic.subscribeId){
+        this.currentGrid.updateMap(message);
+      }
+      
+    } else {                                       // we don't have a grid yet, this is our 1st run
+      console.log('INITIALIZING grid map');
+      // create a new grid, this new grid needs the navigator to delegete its event processing to the navigator.
+      var newGrid = new OccupancyGridNav({
+        message : message,
+        color : this.color,
+        opacity : this.opacity,
+        navigator: this.navigator,
+      });
+
+      // check if we care about the scene
       if (this.tfClient) {
-        // grid is of type ROS3D.SceneNode
-        this.sceneNode.unsubscribeTf();
-        this.sceneNode.remove(this.currentGrid);
-      } else {
-        this.rootObject.remove(this.currentGrid);
+        // console.log('have tf');
+        try{
+          this.currentGrid.dispose();
+        } catch(err) {
+          // pass
+        }
+        this.currentGrid = newGrid;
+        // Create a sceneNode container for our map if we don't have one yet (assume 1st run so we don't have it)
+        if (this.sceneNode === null) {            // create a sceneNode for the occupancyGrid if we dont have one yet
+          this.sceneNode = new SceneNode({
+            frameID : message.header.frame_id,
+            tfClient : this.tfClient,
+            object : newGrid,
+            pose : this.offsetPose
+          });
+          this.sceneNode.name = 'SceneNode_map';
+          this.rootObject.add(this.sceneNode);        // Add the sceneNode container of our map to the viewer's scene
+        } else {                                  // if we have a sceneNode
+          this.sceneNode.add(this.currentGrid);       // NOT SURE OF THIS ELSE BLOCK!!!
+        }
+      } else {                                        // NOT SURE OF THIS ELSE BLOCK!!!
+        this.sceneNode = this.currentGrid = newGrid;
+        this.rootObject.add(this.currentGrid);
       }
-      this.currentGrid.dispose();
-    }
 
-    var newGrid = new OccupancyGridNav({
-      message : message,
-      color : this.color,
-      opacity : this.opacity,
-      navigator: this.navigator,
-    });
-
-    // check if we care about the scene
-    if (this.tfClient) {
-      this.currentGrid = newGrid;
-      if (this.sceneNode === null) {
-        this.sceneNode = new SceneNode({
-          frameID : message.header.frame_id,
-          tfClient : this.tfClient,
-          object : newGrid,
-          pose : this.offsetPose
-        });
-        this.sceneNode.name = 'SceneNode_map';
-        // this.sceneNode.add(this.navigator);
-        this.rootObject.add(this.sceneNode);
-      } else {
-        this.sceneNode.add(this.currentGrid);
-        // this.sceneNode.add(this.navigator);
+      if (this.viewer){
+        // add sceneNode to viewer.selectableObjects
+        this.viewer.addObject(this.sceneNode, true);
       }
-    } else {
-      this.sceneNode = this.currentGrid = newGrid;
-      this.rootObject.add(this.currentGrid);
-      // this.rootObject.add(this.navigator);
-    }
-
-    if (this.viewer){
-      // add sceneNode to viewer.selectableObjects
-      this.viewer.addObject(this.sceneNode, true);
     }
 
     this.emit('change');
 
     // check if we should unsubscribe
     if (!this.continuous) {
-      this.rosTopic.unsubscribe(this.processMessage);
+      // this.rosTopic.unsubscribe(this.processMessage);
+      this.unsubscribe();
     }
   };
 
@@ -65706,6 +65885,7 @@ var UrdfClient = function UrdfClient(options) {
     });
 
     // load all models
+    console.time('ROS3D: URDF LOAD TIME');
     that.urdf = new Urdf({
       urdfModel : urdfModel,
       path : that.path,
@@ -65713,6 +65893,7 @@ var UrdfClient = function UrdfClient(options) {
       tfPrefix : that.tfPrefix,
       loader : that.loader
     });
+    console.timeEnd('ROS3D: URDF LOAD TIME');
     that.rootObject.add(that.urdf);
   });
 };

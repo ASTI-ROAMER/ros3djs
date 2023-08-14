@@ -204,7 +204,7 @@ ROS3D.Viewer.prototype.getRobotPos = function(robotBaseName='Base_Link') {
   var robot = this.scene.getObjectByName(robotBaseName);
   if (robot){
     var pos = new THREE.Vector3();
-    robot.getWorldPosition(pos)
+    robot.getWorldPosition(pos);
     return pos;
   }
 };

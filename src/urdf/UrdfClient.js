@@ -46,6 +46,7 @@ ROS3D.UrdfClient = function(options) {
     });
 
     // load all models
+    console.time('ROS3D: URDF LOAD TIME');
     that.urdf = new ROS3D.Urdf({
       urdfModel : urdfModel,
       path : that.path,
@@ -53,6 +54,7 @@ ROS3D.UrdfClient = function(options) {
       tfPrefix : that.tfPrefix,
       loader : that.loader
     });
+    console.timeEnd('ROS3D: URDF LOAD TIME');
     that.rootObject.add(that.urdf);
   });
 };
