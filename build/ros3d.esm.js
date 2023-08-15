@@ -62176,7 +62176,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     var message = options.message;
     var opacity = options.opacity || 0.7;
     var color = options.color || {r:255,g:255,b:255,a:255};
-    var transform = options.transform || this.defaultTransform;   // Transforms cell (in grid) value to RGB
+    var transform = options.transform || this.costmapPalleteTransform;   // Transforms cell (in grid) value to RGB
 
     // just create dummy
     var geom = new THREE.PlaneBufferGeometry(1, 1);
@@ -62194,15 +62194,20 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     superclass.call(this, geom, material);
 
     // update the texture (after the the super call and this are accessible)
+    this.mapInternalData = null;
     this.mapImageData = null;               // Edit this if you want the update has the same dimensions
     this.mapOrigin = null;
     this.mapWidth = null;
     this.mapHeight = null;
 
     this.color = color;
+    this.opacity = opacity;
+    this.alphaValue = 255*this.opacity;
     this.material = material;
     this.texture = texture;
     this.mapColorTransform = transform;     // Transforms cell (in grid) value to RGB
+    this.colorMap = this.buildColorHashMap(transform);
+    this.plane = new THREE.Plane();         // infinite plane for calculation of intersection
 
     this.excludeFromHighlight = true;       // RANDEL: this will exclude this mesh from Highlighter
 
@@ -62218,9 +62223,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
   // Create update the texture and (geometry) of the grid from the msg
   // This will either create a new texture or update the existing texture
   // This is only for full map topics (nav_msgs/OccupancyGrid)
-  OccupancyGrid.prototype.updateMap = function updateMap (message, transform){
-    if ( transform === void 0 ) transform=this.mapColorTransform;
-
+  OccupancyGrid.prototype.updateMap = function updateMap (message){
     var data = message.data;
 
     // create the geometry
@@ -62229,13 +62232,13 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     var width = info.width;
     var height = info.height;
     
-    if(this.isNewGridSameAsCur(origin, width, height)){
+    if(this.isNewGridSameAsCur(origin, width, height) && !this.isSameMapData(data)){
       // console.log('FULL - SAME MAP UPDATE');
       // if the new map has the same dimensions, just update its imageData
       if(!this.mapImageData){
         console.error('Expecting to have mapImageData since we are updating it, but it is empty');
       }
-
+      this.mapInternalData = data;
       this.buildImageData(this.mapImageData, data, this.mapWidth, this.mapHeight);
       this.texture.needsUpdate = true;
 
@@ -62266,6 +62269,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       this.scale.y = info.resolution;
 
       // create the color material
+      this.mapInternalData = data;
       var imageData = new Uint8Array(width * height * 4);
       this.buildImageData(imageData, data, this.mapWidth, this.mapHeight);
 
@@ -62278,16 +62282,26 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       texture.magFilter = THREE.NearestFilter;
       texture.needsUpdate = true;
 
+      // update plane on full map update only
+      // https://stackoverflow.com/questions/52124088/three-js-turn-three-planegeometry-to-three-plane
+      var normal = new THREE.Vector3();
+      normal.set(0, 0, 1).applyQuaternion(this.quaternion);
+      this.plane.setFromNormalAndCoplanarPoint(normal, this.position);
+
       this.texture = texture;
       this.material.map = texture;
     }
   };
   // This is only for partial update map topics (map_msgs/OccupancyGridUpdate, topics with suffix of "_updates")
-  OccupancyGrid.prototype.updatePartialMap = function updatePartialMap (message, transform){
-    if ( transform === void 0 ) transform=this.mapColorTransform;
-
+  OccupancyGrid.prototype.updatePartialMap = function updatePartialMap (message){
     //https://docs.ros.org/en/jade/api/rviz/html/c++/map__display_8cpp_source.html#l00492
     // Reject updates which have any out-of-bounds data.
+
+    if(this.isSameMapData(message.data)){
+      // console.log('MAP DATA ARE SAMEEE')
+      return;
+    }
+
     if(message.x < 0 || message.y < 0 ||
       this.mapWidth < message.x + message.width ||
       this.mapHeight < message.y + message.height){
@@ -62300,12 +62314,13 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       return;
     }
 
-    message.height;
-    message.width;
-    message.x;
-    message.y;
+    // var height = message.height;
+    // var width = message.width;
+    // var ux = message.x;
+    // var uy = message.y;
 
     this.buildImageData(this.mapImageData, message.data, message.width, message.height, message.x, message.y);
+    this.mapInternalData = message.data;
     this.texture.needsUpdate = true;
 
 
@@ -62323,10 +62338,10 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
         var dataRow = row - y;
         var mapI = col + (dataRow * width);
         // val is a grayscale value, converted from uint8data (data)
-        var val = this.transformMapData(this.getValue(mapI, dataRow, col, data), this.mapColorTransform);
+        // var val = this.transformMapData(this.getValue(mapI, dataRow, col, data), this.mapColorTransform);
 
         // determine the color, color is an array of 4 values (RGBA)
-        var color = this.getColor(mapI, dataRow, col, val);
+        var color = this.colorMap.get(data[mapI]);
 
         // determine the index into the image data array
         var i = (col + (row * width)) * 4;
@@ -62337,7 +62352,28 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     }
 
   };
+  // Compares new data to this.mapInternalData
+  // ASSUMES the compared data have SAME DIMENSIONS (same length)!!!
+  OccupancyGrid.prototype.isSameMapData = function isSameMapData (data){
+    if((!this.mapInternalData) || this.mapInternalData.length !== data.length){
+      return false;
+    }
 
+
+    // console.time('ARRDATA comparison:');
+    // Compare current internal data to new data;
+    for(var i=0, len=this.mapInternalData.length; i < len; i++) {
+      if(this.mapInternalData[i] !== data[i]){
+        return false;
+      }
+
+    }
+    // console.timeEnd('ARRDATA comparison:');
+    // console.log('ARR comp retval: ' + retval);
+
+    return true;
+
+  };
   OccupancyGrid.prototype.isNewGridSameAsCur = function isNewGridSameAsCur (origin, width, height){
     if(this.mapOrigin !== null){
       if(this.mapOrigin.position.x === origin.position.x && 
@@ -62366,40 +62402,41 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
    * @param {int} col the column of the cell
    * @param {object} data the data buffer
    */
-  OccupancyGrid.prototype.getValue = function getValue (index, row, col, data) {
-    return data[index];
-  };
-  /**
-   * Returns a color value given parameters of the position in the grid; the default implementation
-   * scales the default color value by the grid value. Subclasses can extend this functionality
-   * (e.g. lookup a color in a color map).
-   * @param {int} index the current index of the cell
-   * @param {int} row the row of the cell
-   * @param {int} col the column of the cell
-   * @param {float} value the value of the cell
-   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
-   */
-  OccupancyGrid.prototype.getColor = function getColor (index, row, col, value) {
-    return [
-      (value * this.color.r) / 255,
-      (value * this.color.g) / 255,
-      (value * this.color.b) / 255,
-      255
-    ];
-  };
+  // getValue(index, row, col, data) {
+  //   return data[index];
+  // };
 
-  /**
-   * RANDEL!!!
-   * Transforms Occupancy map value [0, 100], to a grayscale map by using the transform <transform>.
-   * @param {int} value occupancy value
-   * @param {function} transform the function used for transformation
-   * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
-   */
-   OccupancyGrid.prototype.transformMapData = function transformMapData (value, transform) {
-    if ( transform === void 0 ) transform=this.defaultTransform;
+  // /**
+  //  * Returns a color value given parameters of the position in the grid; the default implementation
+  //  * scales the default color value by the grid value. Subclasses can extend this functionality
+  //  * (e.g. lookup a color in a color map).
+  //  * @param {int} index the current index of the cell
+  //  * @param {int} row the row of the cell
+  //  * @param {int} col the column of the cell
+  //  * @param {float} value the value of the cell
+  //  * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
+  //  */
+  // getColor(index, row, col, value) {
+  //   return [
+  //     (value * this.color.r) / 255,
+  //     (value * this.color.g) / 255,
+  //     (value * this.color.b) / 255,
+  //     255 * this.opacity
+  //   ];
+  // };
 
-    return transform(value);
-  };
+
+  // /**
+  //  * RANDEL!!!
+  //  * Transforms Occupancy map value [0, 100], to a grayscale map by using the transform <transform>.
+  //  * @param {int} value occupancy value
+  //  * @param {function} transform the function used for transformation
+  //  * @returns r,g,b,a array of values from 0 to 255 representing the color values for each channel
+  //  */
+  //  transformMapData(value, transform=this.defaultTransform) {
+  //   return transform(value);
+  // };
+
   /**
    * RANDEL!!!
    * This is the legacy transform.
@@ -62410,7 +62447,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
    * @returns grayscale value from 0 to 255 representing the occupancy value.
    */
    OccupancyGrid.prototype.defaultTransform = function defaultTransform (value) {
-    var val_trans = value;
+    var val_trans;
     if (value === 100) {
       val_trans = 0;
     } else if (value === 0) {
@@ -62418,8 +62455,64 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     } else {
       val_trans = 127;
     }
-    
-    return val_trans;
+
+    return [
+      val_trans,
+      val_trans,
+      val_trans,
+      255
+    ];
+  };
+
+  // takes OccupancyGrid values [0, 100], then outputs RGBA values for that. Assume input is [-128, 127].
+  // This is the same as RVIZ's costmap pallete;
+  // https://docs.ros.org/en/noetic/api/rviz/html/c++/map__display_8cpp_source.html
+  // value should be considered as int8;
+  OccupancyGrid.prototype.costmapPalleteTransform = function costmapPalleteTransform (value){
+    var rgba = [0,0,0,0];
+    // console.log('COSTMAP');
+
+    if(value === 0){
+      rgba = [0, 0, 0, 0];
+    } else if(1 <= value  && value <= 98){
+      // blue to red spectrum - normal values (1-98)
+      rgba = [value, 0, 255-value, 255];       // red, green, blue, alpha
+    } else if(value === 99){
+      // cyan - inscribed (99)
+      rgba = [0, 255, 255, 255];
+    } else if(value === 100){
+      // purple - lethal (100)
+      rgba = [255, 0, 255, 255];
+    } else if(100 < value && value <= 127){
+      // green - illegal (101-127)
+      rgba = [0, 255, 0, 255];
+    } else if(-128 <= value && value <= -2){
+      // yellow shades - illegal negative (128-254)
+      rgba = [255, (255 * (value + 128)) / 126, 0 , 255];
+    } else if (value === -1){
+      // blueish greenish - legal (-1)
+      rgba = [ 112, 137, 134, 255];
+    }
+    return rgba;
+  };
+
+  // Build a static Map object from a value (occupancygrid value) transformer (to RGBA)
+  OccupancyGrid.prototype.buildColorHashMap = function buildColorHashMap (transform){
+    if ( transform === void 0 ) transform=this.costmapPalleteTransform;
+
+    var m1 = new Map();
+    var rgba;
+    for (var i=-128; i < 127; i++) {
+      // get RGBA values
+      rgba = transform(i);
+      
+      // apply opacity value
+      rgba[3] = rgba[3] * this.opacity;
+
+      // set value to Map object
+      m1.set(i, rgba);
+    }
+    return m1;
   };
 
   return OccupancyGrid;
@@ -62443,7 +62536,7 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
     this.offsetPose = options.offsetPose || new ROSLIB.Pose();
     this.color = options.color || {r:255,g:255,b:255};
     this.opacity = options.opacity || 0.7;
-    this.throttle_rate = options.throttle_rate || 0;
+    this.throttle_rate = options.throttle_rate || 1000;
 
     // current grid that is displayed
     this.currentGrid = null;
@@ -63397,22 +63490,29 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
   Navigator_MW.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
     // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
     // but we need the mouse UP position
-    var poi;
+    var poi = new THREE.Vector3();
     var mouseRaycaster = new THREE.Raycaster();
     mouseRaycaster.params.Line.threshold = 0.001;
     mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
     
-    // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
-    // so recalculate intersection with that object
-    var newIntersections = [];
-    newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
-
-    if (newIntersections) {
-      poi = newIntersections[0].point;
+    if(event3D.intersection.object.plane){
+      // if there is a plane (there is for occupancyGrid/Nav)
+      // https://discourse.threejs.org/t/raycaster-ray-intersecting-plane/2500
+      mouseRaycaster.ray.intersectPlane(event3D.intersection.object.plane, poi);
     } else {
-      poi = event3D.intersection.point;       // revert to mouse down POI if it fails
+      // if object has no plane property
+
+      // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
+      // so recalculate intersection with that object
+      var newIntersections = [];
+      newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
+
+      if (newIntersections.length) {
+        poi.copy(newIntersections[0].point);
+      } else {
+        poi.copy(event3D.intersection.point);       // revert to mouse down POI if it fails
+      }
     }
-    this.poiPose = true;
     return poi;
     
   };
@@ -63503,7 +63603,7 @@ var Navigator = /*@__PURE__*/(function (superclass) {
                               navActionName:      'move_base_msgs/MoveBaseAction',
                               navInitState:       false,
                               color:              0xcc00ff,
-                              intermediateColor:  0x8f00b3,};
+                              intermediateColor:  0xEEACFF,};
     // Update/merge the defaultNavOptions with the given navOptions
     var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
 
@@ -63716,21 +63816,31 @@ var Navigator = /*@__PURE__*/(function (superclass) {
   Navigator.prototype.calculateCurrentPOI = function calculateCurrentPOI (event3D){
     // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
     // but we need the mouse UP position
-    var poi;
+    var poi = new THREE.Vector3();
     var mouseRaycaster = new THREE.Raycaster();
     mouseRaycaster.params.Line.threshold = 0.001;
     mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
     
-    // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
-    // so recalculate intersection with that object
-    var newIntersections = [];
-    newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
 
-    if (newIntersections) {
-      poi = newIntersections[0].point;
+    if(event3D.intersection.object.plane){
+      // if there is a plane (there is for occupancyGrid/Nav)
+      // https://discourse.threejs.org/t/raycaster-ray-intersecting-plane/2500
+      mouseRaycaster.ray.intersectPlane(event3D.intersection.object.plane, poi);
     } else {
-      poi = event3D.intersection.point;       // revert to mouse down POI if it fails
+      // if object has no plane property
+
+      // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
+      // so recalculate intersection with that object
+      var newIntersections = [];
+      newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
+
+      if (newIntersections.length) {
+        poi.copy(newIntersections[0].point);
+      } else {
+        poi.copy(event3D.intersection.point);       // revert to mouse down POI if it fails
+      }
     }
+
     return poi;
   };
 
@@ -66412,9 +66522,9 @@ var Viewer = function Viewer(options) {
   var elem = options.elem;
   var width = options.width;
   var height = options.height;
-  var background = options.background || '#111111';
+  var background = options.background || '#303030';
   var antialias = options.antialias;
-  var intensity = options.intensity || 0.66;
+  var intensity = options.intensity || 0.8;
   var near = options.near || 0.01;
   var far = options.far || 1000;
   var alpha = options.alpha || 1.0;
@@ -66458,6 +66568,7 @@ var Viewer = function Viewer(options) {
   // lights
   this.scene.add(new THREE.AmbientLight(0x555555));
   this.directionalLight = new THREE.DirectionalLight(0xffffff, intensity);
+  this.directionalLight.position.set(0, 0, 10);
   this.scene.add(this.directionalLight);
 
   // propagates mouse events to three.js objects
@@ -66508,7 +66619,7 @@ Viewer.prototype.draw = function draw (){
   // BUG: position is a read-only property of DirectionalLight,
   // attempting to assign to it either does nothing or throws an error.
   //this.directionalLight.position = this.camera.localToWorld(new THREE.Vector3(-1, 1, 0));
-  this.directionalLight.position.normalize();
+  // this.directionalLight.position.normalize();
 
   // set the scene
   this.renderer.clear(true, true, true);

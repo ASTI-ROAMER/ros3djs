@@ -32,9 +32,9 @@ ROS3D.Viewer = function(options) {
   var elem = options.elem;
   var width = options.width;
   var height = options.height;
-  var background = options.background || '#111111';
+  var background = options.background || '#303030';
   var antialias = options.antialias;
-  var intensity = options.intensity || 0.66;
+  var intensity = options.intensity || 0.8;
   var near = options.near || 0.01;
   var far = options.far || 1000;
   var alpha = options.alpha || 1.0;
@@ -78,6 +78,7 @@ ROS3D.Viewer = function(options) {
   // lights
   this.scene.add(new THREE.AmbientLight(0x555555));
   this.directionalLight = new THREE.DirectionalLight(0xffffff, intensity);
+  this.directionalLight.position.set(0, 0, 10);
   this.scene.add(this.directionalLight);
 
   // propagates mouse events to three.js objects
@@ -130,7 +131,7 @@ ROS3D.Viewer.prototype.draw = function(){
   // BUG: position is a read-only property of DirectionalLight,
   // attempting to assign to it either does nothing or throws an error.
   //this.directionalLight.position = this.camera.localToWorld(new THREE.Vector3(-1, 1, 0));
-  this.directionalLight.position.normalize();
+  // this.directionalLight.position.normalize();
 
   // set the scene
   this.renderer.clear(true, true, true);

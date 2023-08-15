@@ -35,7 +35,7 @@ ROS3D.OccupancyGridClient = function(options) {
   this.offsetPose = options.offsetPose || new ROSLIB.Pose();
   this.color = options.color || {r:255,g:255,b:255};
   this.opacity = options.opacity || 0.7;
-  this.throttle_rate = options.throttle_rate || 0;
+  this.throttle_rate = options.throttle_rate || 1000;
 
   // current grid that is displayed
   this.currentGrid = null;

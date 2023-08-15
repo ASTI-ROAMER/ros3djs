@@ -40,7 +40,7 @@
                             navActionName:      'move_base_msgs/MoveBaseAction',
                             navInitState:       false,
                             color:              0xcc00ff,
-                            intermediateColor:  0x8f00b3,};
+                            intermediateColor:  0xEEACFF,};
   // Update/merge the defaultNavOptions with the given navOptions
   var navOptions = Object.assign({}, defaultNavOptions, options.navOptions);
 
@@ -255,21 +255,31 @@ ROS3D.Navigator.prototype.mouseEventHandlerUnbound = function(event3D){
 ROS3D.Navigator.prototype.calculateCurrentPOI = function(event3D){
   // RECALCULATE POI for mouse up since the current event3D.intersection.point is the mouse down location,
   // but we need the mouse UP position
-  var poi;
+  var poi = new THREE.Vector3();
   var mouseRaycaster = new THREE.Raycaster();
   mouseRaycaster.params.Line.threshold = 0.001;
   mouseRaycaster.setFromCamera(event3D.mousePos, event3D.camera);
   
-  // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
-  // so recalculate intersection with that object
-  var newIntersections = [];
-  newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
 
-  if (newIntersections) {
-    poi = newIntersections[0].point;
+  if(event3D.intersection.object.plane){
+    // if there is a plane (there is for occupancyGrid/Nav)
+    // https://discourse.threejs.org/t/raycaster-ray-intersecting-plane/2500
+    mouseRaycaster.ray.intersectPlane(event3D.intersection.object.plane, poi);
   } else {
-    poi = event3D.intersection.point;       // revert to mouse down POI if it fails
+    // if object has no plane property
+
+    // event3D.intersection.object is the OccupancyGridNav object which wast raycasted on previous mouse down
+    // so recalculate intersection with that object
+    var newIntersections = [];
+    newIntersections = mouseRaycaster.intersectObject(event3D.intersection.object);
+
+    if (newIntersections.length) {
+      poi.copy(newIntersections[0].point);
+    } else {
+      poi.copy(event3D.intersection.point);       // revert to mouse down POI if it fails
+    }
   }
+
   return poi;
 };
 
