@@ -103,9 +103,11 @@ ROS3D.PointCloud2.prototype.processMessage = function(msg){
   var bufSz = this.max_pts * msg.point_step;
 
   if (msg.data.buffer) {
+    // create a shallow copy of the data (typed array), up to the max (this.max_pts)
     this.buffer = msg.data.slice(0, Math.min(msg.data.byteLength, bufSz));
      n = Math.min(msg.height*msg.width / pointRatio, this.points.positions.array.length / 3);
   } else {
+    // if data has no arraybuffer, create a new arraybuffer for it
     if (!this.buffer || this.buffer.byteLength < bufSz) {
       this.buffer = new Uint8Array(bufSz);
     }
@@ -119,6 +121,10 @@ ROS3D.PointCloud2.prototype.processMessage = function(msg){
   var y = this.points.fields.y.offset;
   var z = this.points.fields.z.offset;
   var base, color;
+
+  // if there is 'rgb' field, get it
+  // i = index of point in PCL
+  // base = byte index in buffer pointing at start of array for point 'i' in the PCL 
   for(var i = 0; i < n; i++){
     base = i * pointRatio * msg.point_step;
     this.points.positions.array[3*i    ] = dv.getFloat32(base+x, littleEndian);

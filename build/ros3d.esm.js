@@ -62170,6 +62170,56 @@ Highlighter.prototype.restoreVisibility = function restoreVisibility (scene) {
  * @author Russell Toris - rctoris@wpi.edu
  */
 
+// // https://stackoverflow.com/questions/10100798/whats-the-most-straightforward-way-to-copy-an-arraybuffer-object
+// function copyArrayBuffer(src)  {
+//   var dst = new ArrayBuffer(src.byteLength);
+//   new Uint8Array(dst).set(new Uint8Array(src));
+//   return dst;
+// }
+
+// // https://stackoverflow.com/questions/21553528/how-to-test-for-equality-in-arraybuffer-dataview-and-typedarray
+// function areEqualBuffers(buf1, buf2)
+// {
+//     if (buf1.byteLength !== buf2.byteLength) {
+//       return false;
+//     }
+
+//     // var dv1 = new Int8Array(buf1);
+//     // var dv2 = new Int8Array(buf2);
+
+//     var dv1, dv2;
+//     var q = buf1.byteLength % 4;
+//     switch (q){
+//       case 0:
+//         dv1 = new Int32Array(buf1);
+//         dv2 = new Int32Array(buf2);
+//         // console.log('BUF 32');
+//         break;
+//       case 1:                       // fall-through
+//       case 3:
+//         q = 3;                      // we need this below
+//         dv1 = new Int8Array(buf1);
+//         dv2 = new Int8Array(buf2);
+//         // console.log('BUF 8');
+//         break;
+//       case 2:
+//         dv1 = new Int16Array(buf1);
+//         dv2 = new Int16Array(buf2);
+//         // console.log('BUF 16');
+//         break;
+//       default:
+//         console.error('Something is wrong!');
+//     }
+
+//     var arrayLength = buf1.byteLength / (4-q);
+//     for (var i = 0 ; i !== arrayLength  ; i++) {
+//         if (dv1[i] !== dv2[i]) {
+//           return false;
+//         }
+//     }
+//     return true;
+// }
+
 var OccupancyGrid = /*@__PURE__*/(function (superclass) {
   function OccupancyGrid(options) {
     options = options || {};
@@ -62194,8 +62244,9 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     superclass.call(this, geom, material);
 
     // update the texture (after the the super call and this are accessible)
+    // this.mapDataBuffer = new ArrayBuffer();     // message.data.buffer is a ArrayBuffer
     this.mapInternalData = null;
-    this.mapImageData = null;               // Edit this if you want the update has the same dimensions
+    this.mapImageData = null;                   // Edit this if you want the update has the same dimensions
     this.mapOrigin = null;
     this.mapWidth = null;
     this.mapHeight = null;
@@ -62233,7 +62284,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     var height = info.height;
     
     if(this.isNewGridSameAsCur(origin, width, height) && !this.isSameMapData(data)){
-      // console.log('FULL - SAME MAP UPDATE');
+      // console.log('********* FULL - SAME MAP UPDATE');
       // if the new map has the same dimensions, just update its imageData
       if(!this.mapImageData){
         console.error('Expecting to have mapImageData since we are updating it, but it is empty');
@@ -62244,7 +62295,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
 
 
     } else {
-      // console.log('FULL - DIFFERENT MAP UPDATE');
+      // console.log('************* FULL - DIFFERENT MAP UPDATE');
       // update texture and geometry if new map has different dimensions
       // console.log('CREATE new texture for New map');
 
@@ -62297,10 +62348,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     //https://docs.ros.org/en/jade/api/rviz/html/c++/map__display_8cpp_source.html#l00492
     // Reject updates which have any out-of-bounds data.
 
-    if(this.isSameMapData(message.data)){
-      // console.log('MAP DATA ARE SAMEEE')
-      return;
-    }
+    // console.log('***** PARTIAL map update');
 
     if(message.x < 0 || message.y < 0 ||
       this.mapWidth < message.x + message.width ||
@@ -62313,11 +62361,6 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       console.error('Expecting to have mapImageData since we are updating it, but it is empty. Aborting update.');
       return;
     }
-
-    // var height = message.height;
-    // var width = message.width;
-    // var ux = message.x;
-    // var uy = message.y;
 
     this.buildImageData(this.mapImageData, message.data, message.width, message.height, message.x, message.y);
     this.mapInternalData = message.data;
@@ -62354,22 +62397,37 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
   };
   // Compares new data to this.mapInternalData
   // ASSUMES the compared data have SAME DIMENSIONS (same length)!!!
+  // FOR FULL MAP UPDATES ONLY!
   OccupancyGrid.prototype.isSameMapData = function isSameMapData (data){
-    if((!this.mapInternalData) || this.mapInternalData.length !== data.length){
-      return false;
-    }
-
-
+    // var retval = true;
+    // console.log('len: ' + data.length);
     // console.time('ARRDATA comparison:');
     // Compare current internal data to new data;
+    if((!this.mapInternalData) || this.mapInternalData.length !== data.length){
+      return false;
+      // retval = false;
+    }
     for(var i=0, len=this.mapInternalData.length; i < len; i++) {
       if(this.mapInternalData[i] !== data[i]){
         return false;
+        // retval = false;
+        // break;
       }
 
     }
     // console.timeEnd('ARRDATA comparison:');
-    // console.log('ARR comp retval: ' + retval);
+    // console.log('ARR: ' + retval);
+
+
+    // *************
+    // console.log('len:' + this.mapInternalData.length);
+    // console.log('q:' + this.mapInternalData.length % 4);
+    // console.time('BUFDATA comparison:');
+    // retval = true;
+    // retval = areEqualBuffers(this.mapDataBuffer, data.buffer);
+    // console.timeEnd('BUFDATA comparison:');
+    // console.log('BUF: ' + retval);
+    // return retval;
 
     return true;
 
@@ -65484,16 +65542,19 @@ var Points = /*@__PURE__*/(function (superclass) {
                   this.colors = new THREE.BufferAttribute( new Float32Array( this.max_pts * 3), 3, false );
                   this.geom.setAttribute( 'color', this.colors.setDynamic(true) );
                   var offset = field.offset;
-                  this.getColor = [
-                      function(dv,base,le){return dv.getInt8(base+offset,le);},
-                      function(dv,base,le){return dv.getUint8(base+offset,le);},
-                      function(dv,base,le){return dv.getInt16(base+offset,le);},
-                      function(dv,base,le){return dv.getUint16(base+offset,le);},
-                      function(dv,base,le){return dv.getInt32(base+offset,le);},
-                      function(dv,base,le){return dv.getUint32(base+offset,le);},
-                      function(dv,base,le){return dv.getFloat32(base+offset,le);},
-                      function(dv,base,le){return dv.getFloat64(base+offset,le);}
-                  ][field.datatype-1];
+                  // this.getColor = [
+                  //     function(dv,base,le){return dv.getInt8(base+offset,le);},
+                  //     function(dv,base,le){return dv.getUint8(base+offset,le);},
+                  //     function(dv,base,le){return dv.getInt16(base+offset,le);},
+                  //     function(dv,base,le){return dv.getUint16(base+offset,le);},
+                  //     function(dv,base,le){return dv.getInt32(base+offset,le);},
+                  //     function(dv,base,le){return dv.getUint32(base+offset,le);},
+                  //     function(dv,base,le){return dv.getFloat32(base+offset,le);},
+                  //     function(dv,base,le){return dv.getFloat64(base+offset,le);}
+                  // ][field.datatype-1];
+
+                  // RANDEL: fix for 'rgb'channel
+                  this.getColor = function(dv,base,le){return dv.getUint32(base+offset,le);};
                   this.colormap = this.colormap || function(x){return new THREE.Color(x);};
               } else {
                   console.warn('unavailable field "' + this.colorsrc + '" for coloring.');
@@ -65768,9 +65829,11 @@ var PointCloud2 = /*@__PURE__*/(function (superclass) {
     var bufSz = this.max_pts * msg.point_step;
 
     if (msg.data.buffer) {
+      // create a shallow copy of the data (typed array), up to the max (this.max_pts)
       this.buffer = msg.data.slice(0, Math.min(msg.data.byteLength, bufSz));
        n = Math.min(msg.height*msg.width / pointRatio, this.points.positions.array.length / 3);
     } else {
+      // if data has no arraybuffer, create a new arraybuffer for it
       if (!this.buffer || this.buffer.byteLength < bufSz) {
         this.buffer = new Uint8Array(bufSz);
       }
@@ -65784,6 +65847,10 @@ var PointCloud2 = /*@__PURE__*/(function (superclass) {
     var y = this.points.fields.y.offset;
     var z = this.points.fields.z.offset;
     var base, color;
+
+    // if there is 'rgb' field, get it
+    // i = index of point in PCL
+    // base = byte index in buffer pointing at start of array for point 'i' in the PCL 
     for(var i = 0; i < n; i++){
       base = i * pointRatio * msg.point_step;
       this.points.positions.array[3*i    ] = dv.getFloat32(base+x, littleEndian);

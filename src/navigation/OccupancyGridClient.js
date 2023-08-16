@@ -207,4 +207,4 @@ ROS3D.OccupancyGridClient.prototype.processMessage_mapPartialUpdate = function(m
   if(this.currentGrid){
     this.currentGrid.updatePartialMap(message);
   }
-}
+};

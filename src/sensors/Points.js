@@ -68,16 +68,19 @@ ROS3D.Points.prototype.setup = function(frame, point_step, fields)
                 this.colors = new THREE.BufferAttribute( new Float32Array( this.max_pts * 3), 3, false );
                 this.geom.setAttribute( 'color', this.colors.setDynamic(true) );
                 var offset = field.offset;
-                this.getColor = [
-                    function(dv,base,le){return dv.getInt8(base+offset,le);},
-                    function(dv,base,le){return dv.getUint8(base+offset,le);},
-                    function(dv,base,le){return dv.getInt16(base+offset,le);},
-                    function(dv,base,le){return dv.getUint16(base+offset,le);},
-                    function(dv,base,le){return dv.getInt32(base+offset,le);},
-                    function(dv,base,le){return dv.getUint32(base+offset,le);},
-                    function(dv,base,le){return dv.getFloat32(base+offset,le);},
-                    function(dv,base,le){return dv.getFloat64(base+offset,le);}
-                ][field.datatype-1];
+                // this.getColor = [
+                //     function(dv,base,le){return dv.getInt8(base+offset,le);},
+                //     function(dv,base,le){return dv.getUint8(base+offset,le);},
+                //     function(dv,base,le){return dv.getInt16(base+offset,le);},
+                //     function(dv,base,le){return dv.getUint16(base+offset,le);},
+                //     function(dv,base,le){return dv.getInt32(base+offset,le);},
+                //     function(dv,base,le){return dv.getUint32(base+offset,le);},
+                //     function(dv,base,le){return dv.getFloat32(base+offset,le);},
+                //     function(dv,base,le){return dv.getFloat64(base+offset,le);}
+                // ][field.datatype-1];
+
+                // RANDEL: fix for 'rgb'channel
+                this.getColor = function(dv,base,le){return dv.getUint32(base+offset,le);};
                 this.colormap = this.colormap || function(x){return new THREE.Color(x);};
             } else {
                 console.warn('unavailable field "' + this.colorsrc + '" for coloring.');

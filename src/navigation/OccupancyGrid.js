@@ -3,6 +3,56 @@
  * @author Russell Toris - rctoris@wpi.edu
  */
 
+// // https://stackoverflow.com/questions/10100798/whats-the-most-straightforward-way-to-copy-an-arraybuffer-object
+// function copyArrayBuffer(src)  {
+//   var dst = new ArrayBuffer(src.byteLength);
+//   new Uint8Array(dst).set(new Uint8Array(src));
+//   return dst;
+// }
+
+// // https://stackoverflow.com/questions/21553528/how-to-test-for-equality-in-arraybuffer-dataview-and-typedarray
+// function areEqualBuffers(buf1, buf2)
+// {
+//     if (buf1.byteLength !== buf2.byteLength) {
+//       return false;
+//     }
+
+//     // var dv1 = new Int8Array(buf1);
+//     // var dv2 = new Int8Array(buf2);
+
+//     var dv1, dv2;
+//     var q = buf1.byteLength % 4;
+//     switch (q){
+//       case 0:
+//         dv1 = new Int32Array(buf1);
+//         dv2 = new Int32Array(buf2);
+//         // console.log('BUF 32');
+//         break;
+//       case 1:                       // fall-through
+//       case 3:
+//         q = 3;                      // we need this below
+//         dv1 = new Int8Array(buf1);
+//         dv2 = new Int8Array(buf2);
+//         // console.log('BUF 8');
+//         break;
+//       case 2:
+//         dv1 = new Int16Array(buf1);
+//         dv2 = new Int16Array(buf2);
+//         // console.log('BUF 16');
+//         break;
+//       default:
+//         console.error('Something is wrong!');
+//     }
+
+//     var arrayLength = buf1.byteLength / (4-q);
+//     for (var i = 0 ; i !== arrayLength  ; i++) {
+//         if (dv1[i] !== dv2[i]) {
+//           return false;
+//         }
+//     }
+//     return true;
+// }
+
 /**
  * An OccupancyGrid can convert a ROS occupancy grid message into a THREE object.
  *
@@ -36,8 +86,9 @@ ROS3D.OccupancyGrid = function(options) {
   THREE.Mesh.call(this, geom, material);
 
   // update the texture (after the the super call and this are accessible)
+  // this.mapDataBuffer = new ArrayBuffer();     // message.data.buffer is a ArrayBuffer
   this.mapInternalData = null;
-  this.mapImageData = null;               // Edit this if you want the update has the same dimensions
+  this.mapImageData = null;                   // Edit this if you want the update has the same dimensions
   this.mapOrigin = null;
   this.mapWidth = null;
   this.mapHeight = null;
@@ -72,7 +123,7 @@ ROS3D.OccupancyGrid.prototype.updateMap = function(message){
   var height = info.height;
   
   if(this.isNewGridSameAsCur(origin, width, height) && !this.isSameMapData(data)){
-    // console.log('FULL - SAME MAP UPDATE');
+    // console.log('********* FULL - SAME MAP UPDATE');
     // if the new map has the same dimensions, just update its imageData
     if(!this.mapImageData){
       console.error('Expecting to have mapImageData since we are updating it, but it is empty');
@@ -83,7 +134,7 @@ ROS3D.OccupancyGrid.prototype.updateMap = function(message){
 
 
   } else {
-    // console.log('FULL - DIFFERENT MAP UPDATE');
+    // console.log('************* FULL - DIFFERENT MAP UPDATE');
     // update texture and geometry if new map has different dimensions
     // console.log('CREATE new texture for New map');
 
@@ -137,10 +188,7 @@ ROS3D.OccupancyGrid.prototype.updatePartialMap = function(message){
   //https://docs.ros.org/en/jade/api/rviz/html/c++/map__display_8cpp_source.html#l00492
   // Reject updates which have any out-of-bounds data.
 
-  if(this.isSameMapData(message.data)){
-    // console.log('MAP DATA ARE SAMEEE')
-    return;
-  }
+  // console.log('***** PARTIAL map update');
 
   if(message.x < 0 || message.y < 0 ||
     this.mapWidth < message.x + message.width ||
@@ -188,23 +236,37 @@ ROS3D.OccupancyGrid.prototype.buildImageData = function(imageData, data, width, 
 
 // Compares new data to this.mapInternalData
 // ASSUMES the compared data have SAME DIMENSIONS (same length)!!!
+// FOR FULL MAP UPDATES ONLY!
 ROS3D.OccupancyGrid.prototype.isSameMapData = function(data){
-  if((!this.mapInternalData) || this.mapInternalData.length !== data.length){
-    return false;
-  }
-
-
+  // var retval = true;
+  // console.log('len: ' + data.length);
   // console.time('ARRDATA comparison:');
   // Compare current internal data to new data;
+  if((!this.mapInternalData) || this.mapInternalData.length !== data.length){
+    return false;
+    // retval = false;
+  }
   for(var i=0, len=this.mapInternalData.length; i < len; i++) {
     if(this.mapInternalData[i] !== data[i]){
       return false;
-      break;
+      // retval = false;
+      // break;
     }
 
   }
   // console.timeEnd('ARRDATA comparison:');
-  // console.log('ARR comp retval: ' + retval);
+  // console.log('ARR: ' + retval);
+
+
+  // *************
+  // console.log('len:' + this.mapInternalData.length);
+  // console.log('q:' + this.mapInternalData.length % 4);
+  // console.time('BUFDATA comparison:');
+  // retval = true;
+  // retval = areEqualBuffers(this.mapDataBuffer, data.buffer);
+  // console.timeEnd('BUFDATA comparison:');
+  // console.log('BUF: ' + retval);
+  // return retval;
 
   return true;
 
@@ -351,7 +413,7 @@ ROS3D.OccupancyGrid.prototype.buildColorHashMap = function(transform=this.costma
     m1.set(i, rgba);
   }
   return m1;
-}
+};
 
 
 ROS3D.OccupancyGrid.prototype.__proto__ = THREE.Mesh.prototype;
