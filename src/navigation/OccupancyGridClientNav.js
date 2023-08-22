@@ -98,6 +98,7 @@ ROS3D.OccupancyGridClientNav.prototype.processMessage = function(message){
       message : message,
       color : this.color,
       opacity : this.opacity,
+      transform: this.transform,
       navigator: this.navigator,
     });
 

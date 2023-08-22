@@ -36,6 +36,10 @@ ROS3D.OccupancyGridClient = function(options) {
   this.color = options.color || {r:255,g:255,b:255};
   this.opacity = options.opacity || 0.7;
   this.throttle_rate = options.throttle_rate || 1000;
+  this.use_updates_topic = (typeof options.use_updates_topic === 'undefined') ? true : options.use_updates_topic;
+  this.transform = options.transform;
+
+
 
   // current grid that is displayed
   this.currentGrid = null;
@@ -77,7 +81,7 @@ ROS3D.OccupancyGridClient.prototype.subscribe = function(){
   console.log('Subscribing to: ' + this.topicName);
   this.rosTopic.subscribe(this.processMessage.bind(this));
 
-  if(this.continuous){
+  if(this.continuous && this.use_updates_topic){
     this.rosTopic_mapPartialUpdate = new ROSLIB.Topic({
       ros : this.ros,
       name : this.topicName + '_updates',
@@ -157,6 +161,7 @@ ROS3D.OccupancyGridClient.prototype.processMessage = function(message){
       message : message,
       color : this.color,
       opacity : this.opacity,
+      transform: this.transform,
     });
 
     // check if we care about the scene

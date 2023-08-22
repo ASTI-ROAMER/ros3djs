@@ -62226,7 +62226,25 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     var message = options.message;
     var opacity = options.opacity || 0.7;
     var color = options.color || {r:255,g:255,b:255,a:255};
-    var transform = options.transform || this.costmapPalleteTransform;   // Transforms cell (in grid) value to RGB
+    var transform = options.transform || 'costmap';   // Transforms cell (in grid) value to RGB
+
+    if (typeof transform === 'string'){
+      // console.log('transform string is:' + options.transform);
+      switch(transform.toLowerCase()){
+        case 'bw':
+          transform = this.bwMapPalleteTransform;
+          break;
+        case 'old':
+        case 'grayscale':
+        case 'greyscale':
+          transform = this.defaultTransform;
+          break;
+        case 'costmap':
+        default:
+          transform = this.costmapPalleteTransform;
+          break;
+      }
+    }
 
     // just create dummy
     var geom = new THREE.PlaneBufferGeometry(1, 1);
@@ -62239,6 +62257,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       opacity : opacity
     });
     material.side = THREE.DoubleSide;
+    material.depthWrite = false;                // RANDEL: IMPORTANT for transparent planes!!!
 
     // create the mesh
     superclass.call(this, geom, material);
@@ -62290,7 +62309,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
         console.error('Expecting to have mapImageData since we are updating it, but it is empty');
       }
       this.mapInternalData = data;
-      this.buildImageData(this.mapImageData, data, this.mapWidth, this.mapHeight);
+      this.buildImageData(this.mapImageData, this.mapWidth, this.mapHeight, data);
       this.texture.needsUpdate = true;
 
 
@@ -62322,7 +62341,7 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       // create the color material
       this.mapInternalData = data;
       var imageData = new Uint8Array(width * height * 4);
-      this.buildImageData(imageData, data, this.mapWidth, this.mapHeight);
+      this.buildImageData(imageData, this.mapWidth, this.mapHeight, data);
 
       this.mapImageData = imageData;
       // console.log(this.mapImageData);
@@ -62362,35 +62381,42 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
       return;
     }
 
-    this.buildImageData(this.mapImageData, message.data, message.width, message.height, message.x, message.y);
+    this.buildImageData(this.mapImageData, this.mapWidth, this.mapHeight, message.data, message.width, message.height, message.x, message.y);
     this.mapInternalData = message.data;
     this.texture.needsUpdate = true;
 
 
   };
-  OccupancyGrid.prototype.buildImageData = function buildImageData (imageData, data, width, height, x, y){
+  OccupancyGrid.prototype.buildImageData = function buildImageData (imageData, imWidth, imHeight, 
+                                                          data, dataWidth, dataHeight, x, y){
+    if ( dataWidth === void 0 ) dataWidth=imWidth;
+    if ( dataHeight === void 0 ) dataHeight=imHeight;
     if ( x === void 0 ) x=0;
     if ( y === void 0 ) y=0;
 
     // THIS ASSUMES that the data from the update is WITHIN THE BOUND OF imageData!!!!
     // Iterate over writable indeces of imageData, specified the starting positon (x,y) and the dimension of the data
     // - row and col are in imageData coordinates
-    for ( var row = y; row < height+y; row++) {
-      for ( var col = x; col < width+x; col++) {
+    for ( var row = y; row < dataHeight+y; row++) {
+      for ( var col = x; col < dataWidth+x; col++) {
         // Determine the index to be used for extractring values from data (data[0] corresponds to (x,y) data)
         var dataRow = row - y;
-        var mapI = col + (dataRow * width);
+        var mapI = col + (dataRow * dataWidth);
         // val is a grayscale value, converted from uint8data (data)
         // var val = this.transformMapData(this.getValue(mapI, dataRow, col, data), this.mapColorTransform);
 
         // determine the color, color is an array of 4 values (RGBA)
         var color = this.colorMap.get(data[mapI]);
 
-        // determine the index into the image data array
-        var i = (col + (row * width)) * 4;
-
+        // determine the index into the image data array, WIDTH to use should be THE ORIGINAL image's width!!!!
+        var i = (col + (row * imWidth)) * 4;
         // copy the color
-        imageData.set(color, i);
+        try{
+          imageData.set(color, i);
+        } catch(err){
+          console.log('Image building stopped.');
+          return;
+        }
       }
     }
 
@@ -62554,6 +62580,26 @@ var OccupancyGrid = /*@__PURE__*/(function (superclass) {
     return rgba;
   };
 
+  OccupancyGrid.prototype.bwMapPalleteTransform = function bwMapPalleteTransform (value){
+    var rgba = [0,0,0,0];
+    // console.log('COSTMAP');
+
+    if(0 <= value  && value <= 100){
+      var v = 255 - (255 * value) / 100;
+      rgba = [v, v, v, 255];       // red, green, blue, alpha
+    } else if(100 < value && value <= 127){
+      // green - illegal (101-127)
+      rgba = [0, 255, 0, 255];
+    } else if(-128 <= value && value <= -2){
+      // yellow shades - illegal negative (128-254)
+      rgba = [255, (255 * (value + 128)) / 126, 0 , 255];
+    } else if (value === -1){
+      // blueish greenish - legal (-1)
+      rgba = [ 112, 137, 134, 255];
+    }
+    return rgba;
+  };
+
   // Build a static Map object from a value (occupancygrid value) transformer (to RGBA)
   OccupancyGrid.prototype.buildColorHashMap = function buildColorHashMap (transform){
     if ( transform === void 0 ) transform=this.costmapPalleteTransform;
@@ -62595,6 +62641,10 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
     this.color = options.color || {r:255,g:255,b:255};
     this.opacity = options.opacity || 0.7;
     this.throttle_rate = options.throttle_rate || 1000;
+    this.use_updates_topic = (typeof options.use_updates_topic === 'undefined') ? true : options.use_updates_topic;
+    this.transform = options.transform;
+
+
 
     // current grid that is displayed
     this.currentGrid = null;
@@ -62637,7 +62687,7 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
     console.log('Subscribing to: ' + this.topicName);
     this.rosTopic.subscribe(this.processMessage.bind(this));
 
-    if(this.continuous){
+    if(this.continuous && this.use_updates_topic){
       this.rosTopic_mapPartialUpdate = new ROSLIB.Topic({
         ros : this.ros,
         name : this.topicName + '_updates',
@@ -62716,6 +62766,7 @@ var OccupancyGridClient = /*@__PURE__*/(function (EventEmitter2) {
         message : message,
         color : this.color,
         opacity : this.opacity,
+        transform: this.transform,
       });
 
       // check if we care about the scene
@@ -63991,6 +64042,7 @@ var OccupancyGridClientNav = /*@__PURE__*/(function (OccupancyGridClient) {
         message : message,
         color : this.color,
         opacity : this.opacity,
+        transform: this.transform,
         navigator: this.navigator,
       });
 
