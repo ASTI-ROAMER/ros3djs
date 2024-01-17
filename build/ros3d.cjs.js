@@ -63123,6 +63123,8 @@ var OccupancyGridNav = /*@__PURE__*/(function (OccupancyGrid) {
  * @author Randel Capati - randelmc21@gmail.com
  *///Mitz - FOR MANAGED WAYPOINTS 
 
+// import { Pose } from "roslib";
+
 
 var Navigator_MW = /*@__PURE__*/(function (superclass) {
   function Navigator_MW(options) {
@@ -63167,14 +63169,78 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
 
     // Proxy handler object
     this.arrayChangeHandler = {
+      // https://stackoverflow.com/questions/35610242/detecting-changes-in-a-javascript-array-using-the-proxy-object
       that: this,       // maintain a reference of the navigator object in this proxy handler
-      get: function(target, prop, value) {
+      get: function(target, prop, receiver) {
+        // static functions first
+        var findFirstPoseInList = function (startIndex, returnFoundIndex) {
+          if ( startIndex === void 0 ) startIndex=0;
+          if ( returnFoundIndex === void 0 ) returnFoundIndex=false;
+
+          // Given the the starting point of the search (lowest index), search starting from it the go up, up to the last elem in the list
+          //    returns the last Pose in the list, if there was none, return undefined
+
+          // If negative index or no elements, return null
+          if (startIndex >= target.length || target.length === 0){
+            if (returnFoundIndex){
+              return [null, -1];
+            } else {
+              return null;
+            }
+          } else if (startIndex < 0){
+            startIndex = 0;
+          }
+
+          for (var _idx = startIndex; _idx < target.length; _idx++) {
+            if (target[_idx].constructor.name  === 'Pose'){
+                console.log('Found first Pose object in list at index: ', _idx);
+                if (returnFoundIndex){
+                  return [target[_idx], _idx];
+                } else {
+                  return target[_idx];
+                }
+            }
+          }
+
+        };
+
+        var findLastPoseInList = function (lastIndex, returnFoundIndex) {
+          if ( lastIndex === void 0 ) lastIndex=target.length-1;
+          if ( returnFoundIndex === void 0 ) returnFoundIndex=false;
+
+          // Given the the starting point of the search (biggest index), search starting from it the go down up to the 1st elem in the list
+          //    returns the last Pose in the list, if there was none, return undefined
+
+          // If negative index or no elements, return undefined
+          if (lastIndex < 0 || target.length === 0){
+            if (returnFoundIndex){
+              return [null, -1];
+            } else {
+              return null;
+            }
+          } else if (lastIndex >= target.length){
+            lastIndex = target.length-1;
+          }
+
+          for (var _idx = lastIndex; _idx >= 0; _idx--) {
+            if (target[_idx].constructor.name  === 'Pose'){
+                console.log('Found last Pose object in list at index: ', _idx);
+                if (returnFoundIndex){
+                  return [target[_idx], _idx];
+                } else {
+                  return target[_idx];
+                }
+            }
+          }
+
+        };
+
         var val = target[prop];
         // console.log('GETTING [' + prop);
         if (typeof val === 'function') {
           if (['pop', 'push', 'splice'].includes(prop)) {
             return function () {
-              var ref;
+              var assign, assign$1, ref;
 
               var args = Array.from(arguments);
               console.log('===' + prop);
@@ -63187,7 +63253,18 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                   // Create a marker for each pushed element on the goalList!!!
                   // Assume one element per push.
                   var newROSPose = args[0];
-                  var oldROSPose = that.goalList.at(-1); 
+                  // let oldROSPose = undefined;
+                  // Check if the element to be pushed is a Pose
+                  if (newROSPose.constructor.name !== 'Pose'){
+                    // add an element null to the nodeMarkeList so that indexing of goalList with nodeMarkeList will be the same
+                    that.nodeMarkerList.push(null);             
+                    break;            // Don't do anything to the UI unless the new item is a Pose
+                  }
+                  
+                  // Find the last ROS3D.Pose object in the list
+                  var oldROSPose = findLastPoseInList();
+
+                  // let oldROSPose = that.goalList.at(-1); 
                   var poseMarker = that.addPoseMarker(newROSPose.position, newROSPose.orientation);
                   var connMarker = null;
                   if(oldROSPose){
@@ -63204,15 +63281,15 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                     
                   //   that.nodeMarkerList.push({'node': poseMarker, 'conn0': connMarker});
                   // });
-                  that.rootObject.emit('navigationUpd');
-                } break;
+                  break;
+                } 
                 case 'splice': {
                   // RANDEL: NOW IT IS FULL IMPLEMENTATION OF SPLICE
                   // Sometimes, splice is called with undefined: arr.splice(undefined, 1). It parses the undefined as 0.
                   var start = args[0];
                   var deleteCount = args[1];
                   var items = args.slice(2);
-                  var nodeIndexBefore, nodeIndexAfter, oldROSPose$1, newROSPose$1, nodeAfterMarkerObj, connMarker$1;
+                  var nodeIndexBefore, nodeIndexAfter, nextPoseNodeIndexAfter, oldROSPose$1, newROSPose$1, nodeAfterMarkerObj, poseMarker$1, connMarker$1;
 
                   switch(args.length){
                     case 0:
@@ -63231,9 +63308,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                       //  so we can adjust their connectors
                       nodeIndexBefore = start - 1;
                       nodeIndexAfter = start + deleteCount;
-                      oldROSPose$1 = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
-                      newROSPose$1 = that.goalList[nodeIndexAfter];
-                      nodeAfterMarkerObj = that.nodeMarkerList.at(nodeIndexAfter);
+                      // oldROSPose = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
+                      oldROSPose$1 = findLastPoseInList(nodeIndexBefore);
+                      // newROSPose = that.goalList[nodeIndexAfter];
+                      (assign = findFirstPoseInList(nodeIndexAfter, true), newROSPose$1 = assign[0], nextPoseNodeIndexAfter = assign[1]);
+                      nodeAfterMarkerObj = that.nodeMarkerList[nextPoseNodeIndexAfter];
 
                       // Remove all nodes and connectors from scene for the given indeces
                       for(var i=start, c=0; c<deleteCount; c++, i++){
@@ -63270,9 +63349,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                       //  so we can adjust their connectors
                       nodeIndexBefore = start - 1;
                       nodeIndexAfter = start + deleteCount;
-                      oldROSPose$1 = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
-                      newROSPose$1 = that.goalList[nodeIndexAfter];
-                      nodeAfterMarkerObj = that.nodeMarkerList.at(nodeIndexAfter);
+                      // oldROSPose = that.goalList[nodeIndexBefore];      // **** DONT USE Array.at() *****
+                      oldROSPose$1 = findLastPoseInList(nodeIndexBefore);
+                      // newROSPose = that.goalList[nodeIndexAfter];
+                      (assign$1 = findFirstPoseInList(nodeIndexAfter, true), newROSPose$1 = assign$1[0], nextPoseNodeIndexAfter = assign$1[1]);
+                      nodeAfterMarkerObj = that.nodeMarkerList[nextPoseNodeIndexAfter];
 
                       // Remove all nodes and connectors from scene for the given indeces
                       for(var i$1=start, c$1=0; c$1<deleteCount; c$1++, i$1++){
@@ -63285,19 +63366,24 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                       }
 
                       // create node markers for each item, then put them into a list
-                      var lastInsertedPose = null;
-                      var addedPoseMarkers= [];
-                      connMarker$1 = null;
+                      var addedPoseMarkers= [];     // temporary storage of poseMarkers {node:node, conn0:conn0}
+                      
                       for(var k in items){
-                        var poseMarker$1 = that.addPoseMarker(items[k].position, items[k].orientation);
+                        var xxxROSPose = items[k];
+                        // Check if the item is a Pose
+                        if (xxxROSPose.constructor.name !== 'Pose'){
+                          addedPoseMarkers.push(null);                // Don't update oldROSPose since the cur item is not a Pose
+                          break;            
+                        }
+
+                        connMarker$1 = null;
+                        poseMarker$1 = that.addPoseMarker(items[k].position, items[k].orientation);
                         if(oldROSPose$1){
                           connMarker$1 = that.addConnectorMarker(items[k].position, oldROSPose$1.position);
                         }
-                        lastInsertedPose = {'node': poseMarker$1, 'conn0': connMarker$1};
-                        addedPoseMarkers.push(lastInsertedPose);
+                        addedPoseMarkers.push({'node': poseMarker$1, 'conn0': connMarker$1});
                         // reset and update
-                        connMarker$1 = null;
-                        oldROSPose$1 = items[k];
+                        oldROSPose$1 = items[k];          // at this point , we are sure that the current item is a pose, so update oldROSPose
                       }
 
                       // Modify conn0 of the next node, if it exists.
@@ -63318,8 +63404,8 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                       (ref = that.nodeMarkerList).splice.apply(ref, [ start, deleteCount ].concat( addedPoseMarkers ));
                       break;
                   }
-                  that.rootObject.emit('navigationUpd');
-                } break;
+                  break;
+                } 
                 case 'pop': {
                   var tempNodeObj = that.nodeMarkerList.pop();
                   try{
@@ -63329,15 +63415,24 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                   } catch(err$4){
                     console.log('No marker to delete.');
                   }
-                  that.rootObject.emit('navigationUpd');
-                } break;
-                default:
-                  that.rootObject.emit('navigationUpd');
+                  break;
+                } 
               }
-              return Array.prototype[prop].apply(target, arguments);      // This line (the apply) mutates the goalList
+
+              // Apply array manipulation after updating threejs UI elements.
+              var retval = Array.prototype[prop].apply(target, arguments);    // This line (the apply) mutates the goalList
+
+              // Send signals after array is manipulated (for push, splice, and pop only) , NOTE: array WAS ALREADY UPDATED
+              that.rootObject.emit('navigationUpd');
+
+              return retval;
             };
           }
           return val.bind(target);
+        } 
+        // Disable other mutable methods
+        else if (['unshift', 'shift', 'fill', 'reverse', 'sort', 'copyWithin'].includes(prop)){
+          throw Error(("Array method [" + prop + "] not supported yet."));
         }
         return val;
       },
@@ -63403,6 +63498,10 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
     if ( ori === void 0 ) ori={x:0.0, y:0.0, z:0.0, w:1.0};
     if ( c === void 0 ) c=this.color;
 
+    if (!pos){
+      // Don't do anything if there is no position
+      return;
+    }
     this.goalMarkerOptions.origin  = new THREE.Vector3(pos.x, pos.y, pos.z);
     this.goalMarkerOptions.rot = new THREE.Quaternion(ori.x, ori.y, ori.z, ori.w);
     this.goalMarkerOptions.direction = new THREE.Vector3(1,0,0);
