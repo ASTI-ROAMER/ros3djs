@@ -63201,6 +63201,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                 }
             }
           }
+          if (returnFoundIndex){
+            return [null, -1];
+          } else {
+            return null;
+          }
 
         };
 
@@ -63231,6 +63236,11 @@ var Navigator_MW = /*@__PURE__*/(function (superclass) {
                   return target[_idx];
                 }
             }
+          }
+          if (returnFoundIndex){
+            return [null, -1];
+          } else {
+            return null;
           }
 
         };

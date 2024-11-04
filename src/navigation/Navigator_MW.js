@@ -97,6 +97,11 @@ ROS3D.Navigator_MW = function(options) {
               }
           }
         }
+        if (returnFoundIndex){
+          return [null, -1];
+        } else {
+          return null;
+        }
 
       };
 
@@ -124,6 +129,11 @@ ROS3D.Navigator_MW = function(options) {
                 return target[_idx];
               }
           }
+        }
+        if (returnFoundIndex){
+          return [null, -1];
+        } else {
+          return null;
         }
 
       };
