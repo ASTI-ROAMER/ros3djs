@@ -66843,7 +66843,11 @@ var Viewer = function Viewer(options) {
 
   // add the renderer to the page
   var node = elem || document.getElementById(divID);
-  node.appendChild(this.renderer.domElement);
+  if(!node.hasChildNodes()){
+    node.appendChild(this.renderer.domElement);
+  }else {
+    node.replaceChildren(this.renderer.domElement);
+  }
 
   // begin the render loop
   this.start();
